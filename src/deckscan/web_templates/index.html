@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+
+<form class="card" action="/jobs" method="post" enctype="multipart/form-data" id="upload-form">
+  <div class="eyebrow">Deck Analyzer</div>
+  <h1>Pitch Deck<span class="arrow">&rarr;</span><span class="to">Investor One&#8209;Pager</span></h1>
+  <p class="lede">
+    Upload a pitch deck and get two single-page PDFs: a polished investor one-pager,
+    and a financial screen whose red flags are computed from the numbers Claude
+    found — each one citing the page it came from.
+  </p>
+
+  {% if api_key_missing %}
+  <div class="notice">
+    <span>
+      <b>ANTHROPIC_API_KEY is not configured.</b> Uploads are disabled until the key is set
+      in the environment. Create one at
+      <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>.
+    </span>
+  </div>
+  {% endif %}
+
+  <label class="dropzone" for="deck-upload" data-dropzone>
+    <div class="dropzone-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-100)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+        <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/>
+      </svg>
+    </div>
+    <div class="dropzone-title" data-label>Click or drop a deck here</div>
+    <div class="dropzone-sub" data-sub>
+      {% for ext in deck_extensions %}<b>{{ ext }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}
+      &nbsp;·&nbsp; up to {{ max_mb }}&nbsp;MB
+    </div>
+    <input class="file-input" type="file" id="deck-upload" name="deck"
+           accept="{{ deck_accept }}" required>
+  </label>
+
+  <label class="dropzone secondary" for="model-upload" data-dropzone>
+    <div class="dropzone-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-100)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/>
+      </svg>
+    </div>
+    <div>
+      <div class="dropzone-title" data-label>Financial model — optional</div>
+      <div class="dropzone-sub" data-sub>
+        {% for ext in model_extensions %}<b>{{ ext }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}
+        &nbsp;·&nbsp; authoritative where it and the deck disagree
+      </div>
+    </div>
+    <input class="file-input" type="file" id="model-upload" name="model"
+           accept="{{ model_accept }}">
+  </label>
+
+  <button class="cta" type="submit" id="submit"
+          {% if api_key_missing %}disabled{% endif %}>Generate one-pager PDF</button>
+
+  <div class="disclosure">
+    Claude reads the documents; every red flag is then computed in Python from the figures
+    it found, so the same reading always produces the same verdicts. Uploads and generated
+    PDFs are deleted from the server after {{ ttl_minutes }} minutes, and nothing is emailed
+    or stored anywhere else.
+  </div>
+</form>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-dropzone]").forEach(zone => {
+  const input = zone.querySelector("input[type=file]");
+  const label = zone.querySelector("[data-label]");
+  const idle = label.textContent;
+
+  const show = () => {
+    const file = input.files && input.files[0];
+    label.textContent = file ? file.name : idle;
+    zone.classList.toggle("is-loaded", Boolean(file));
+  };
+
+  input.addEventListener("change", show);
+
+  ["dragenter", "dragover"].forEach(type => zone.addEventListener(type, event => {
+    event.preventDefault();
+    zone.classList.add("is-dragging");
+  }));
+  ["dragleave", "drop"].forEach(type => zone.addEventListener(type, event => {
+    event.preventDefault();
+    zone.classList.remove("is-dragging");
+  }));
+  zone.addEventListener("drop", event => {
+    const dropped = event.dataTransfer && event.dataTransfer.files;
+    if (!dropped || !dropped.length) return;
+    input.files = dropped;
+    show();
+  });
+});
+
+document.getElementById("upload-form").addEventListener("submit", () => {
+  const button = document.getElementById("submit");
+  button.disabled = true;
+  button.textContent = "Uploading…";
+});
+</script>
+{% endblock %}

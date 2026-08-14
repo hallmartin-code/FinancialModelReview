@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}TEN Capital Network — {{ job.company or job.deck_name }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="eyebrow is-working" id="eyebrow">Analyzing</div>
+  <h1 id="heading">{{ job.company or job.deck_name }}</h1>
+  <p class="lede" id="lede">
+    Claude is reading the deck, then the rule engine scores it. This usually takes
+    under a minute.
+  </p>
+
+  <ul class="steps" id="steps">
+    {% for step in job.steps() %}
+    <li class="{{ step.state }}"><span class="dot"></span>{{ step.label }}</li>
+    {% endfor %}
+  </ul>
+
+  <div class="notice" id="error" {% if not job.error %}style="display:none"{% endif %}>
+    <span id="error-text">{{ job.error or "" }}</span>
+  </div>
+
+  <div class="notice warn" id="warning" style="display:none">
+    <span><b>The deck could not be read.</b> <span id="warning-text"></span>
+    These PDFs record what is missing, not what the deck says.</span>
+  </div>
+
+  <div id="results" {% if job.status != 'done' %}style="display:none"{% endif %}>
+    <div class="scoreline">
+      <div class="score" id="score">–<span class="of">/100</span></div>
+      <div class="band" id="band"></div>
+    </div>
+
+    <dl class="tiles" id="tiles"></dl>
+
+    <div class="downloads" id="downloads"></div>
+
+    <div class="disclosure">
+      Available for {{ ttl_minutes }} minutes, then deleted from the server.
+      Automated screen — findings are extraction-based and require analyst verification
+      before any investment decision.
+    </div>
+  </div>
+
+  <a class="backlink" href="/">&larr; Analyze another deck</a>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const jobId = {{ job.id | tojson }};
+const LABELS = ["Reading the deck", "Running the rule engine", "Rendering the one-pagers"];
+
+const DOC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.6"
+  stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/>
+  <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/>
+  <path d="M12 11v6m0 0-2.5-2.5M12 17l2.5-2.5"/></svg>`;
+
+function band(score) {
+  if (score >= 80) return ["well", "Well grounded"];
+  if (score >= 50) return ["needs", "Needs grounding"];
+  return ["weak", "Weakly grounded"];
+}
+
+function renderSteps(data) {
+  const current = LABELS.indexOf(data.stage);
+  document.getElementById("steps").innerHTML = LABELS.map((label, i) => {
+    let state = "pending";
+    if (data.status === "done") state = "done";
+    else if (current < 0) state = "pending";
+    else if (i < current) state = "done";
+    else if (i > current) state = "pending";
+    else state = data.status === "error" ? "failed" : "active";
+    return `<li class="${state}"><span class="dot"></span>${label}</li>`;
+  }).join("");
+}
+
+function renderError(data) {
+  const strip = document.getElementById("error");
+  if (!data.error) { strip.style.display = "none"; return; }
+  document.getElementById("error-text").textContent = data.error;
+  strip.style.display = "flex";
+  const eyebrow = document.getElementById("eyebrow");
+  eyebrow.textContent = "Failed";
+  eyebrow.className = "eyebrow is-error";
+  document.getElementById("lede").textContent =
+    "The run stopped before it finished. Nothing was saved.";
+}
+
+function renderResults(data) {
+  const counts = data.counts || {};
+
+  if (data.warning) {
+    document.getElementById("warning-text").textContent = data.warning;
+    document.getElementById("warning").style.display = "flex";
+  }
+  const [cls, label] = band(data.score ?? 0);
+
+  document.getElementById("score").innerHTML =
+    `${data.score ?? "–"}<span class="of">/100</span>`;
+  const badge = document.getElementById("band");
+  badge.className = `band ${cls}`;
+  badge.textContent = label;
+
+  document.getElementById("tiles").innerHTML = [
+    ["Critical", counts.critical ?? 0, "critical"],
+    ["High", counts.high ?? 0, "high"],
+    ["Medium", counts.medium ?? 0, ""],
+    ["Gaps", data.gaps ?? 0, ""],
+  ].map(([name, value, cls]) =>
+    `<div class="tile ${value > 0 ? cls : ''}"><dt>${name}</dt><dd>${value}</dd></div>`
+  ).join("");
+
+  const links = [
+    [data.onepager, "Investor one-pager", "PDF"],
+    [data.screen, "Financial screen", "PDF"],
+    [data.json, "Full analysis", "JSON"],
+  ].filter(([href]) => href);
+
+  document.getElementById("downloads").innerHTML = links.map(([href, name, kind]) =>
+    `<a class="download" href="${href}">${DOC_ICON}<span>${name}</span>
+      <span class="kind">${kind}</span></a>`
+  ).join("");
+
+  document.getElementById("results").style.display = "block";
+  const eyebrow = document.getElementById("eyebrow");
+  eyebrow.textContent = "Complete";
+  eyebrow.className = "eyebrow";
+  document.getElementById("lede").style.display = "none";
+}
+
+async function poll() {
+  try {
+    const response = await fetch(`/api/jobs/${jobId}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.company) document.getElementById("heading").textContent = data.company;
+      renderSteps(data);
+      renderError(data);
+      if (data.status === "done") { renderResults(data); return; }
+      if (data.status === "error") return;
+    }
+  } catch (err) {
+    // transient network error; keep polling
+  }
+  setTimeout(poll, 2000);
+}
+poll();
+</script>
+{% endblock %}

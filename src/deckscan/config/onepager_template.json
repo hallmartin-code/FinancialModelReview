@@ -1,0 +1,128 @@
+{
+  "template_name": "one_pager",
+  "version": "1.0",
+  "description": "Structural template for the single-page investor one-pager. Declares which fields are analyzed in every source document and how each is laid out on the page. Contains no company-specific content: every value here is structure, label, placeholder, or style.",
+
+  "analysis_fields": {
+    "company_name": "The company name exactly as written in the source document.",
+    "tagline": "One-line positioning statement or descriptor for the company.",
+    "problem": "The problem the company addresses, in 1-3 sentences.",
+    "solution": "The product or technology and how it works, in 1-3 sentences.",
+    "why_now": "The timing thesis: why this opportunity exists at this moment.",
+    "business_model": "How the company makes money: pricing, model, transaction structure.",
+    "market_size": "TAM/SAM/SOM figures and the market narrative, with any stated sources.",
+    "traction": "Revenue, users, growth, pilots, grants, or other concrete traction evidence.",
+    "team": "Key founders and executives with the background stated in the source document.",
+    "stage": "Company stage, e.g. Pre-seed, Seed, Series A, as stated or clearly labeled.",
+    "ask": "Raise amount, instrument, use of funds, runway, and amount committed to date.",
+    "key_risks_retired": "De-risking already achieved: validation, approvals, partnerships.",
+    "contact": "Founder or contact name and email address if present in the source document."
+  },
+
+  "page": {
+    "size": "letter",
+    "orientation": "portrait",
+    "width_pt": 612,
+    "height_pt": 792,
+    "margin_pt": 36,
+    "gutter_pt": 18,
+    "max_pages": 1
+  },
+
+  "palette": {
+    "navy": "#1B2A4A",
+    "tagline_gray": "#A8B8D0",
+    "label_gray": "#6B7A8D",
+    "footer_bg": "#F4F6F8",
+    "footer_text": "#9AA5B4",
+    "black": "#000000",
+    "white": "#FFFFFF"
+  },
+
+  "typography": {
+    "body_font": "Helvetica",
+    "bold_font": "Helvetica-Bold",
+    "label_size_pt": 8.0,
+    "content_size_pt": 9.0,
+    "content_leading_pt": 11.5,
+    "label_gap_pt": 3.0,
+    "section_gap_pt": 4.0
+  },
+
+  "header": {
+    "height_pt": 80,
+    "background": "navy",
+    "elements": [
+      {
+        "field": "company_name",
+        "placeholder": "{{company_name}}",
+        "required": true,
+        "font": "bold_font",
+        "size_pt": 28,
+        "color": "white",
+        "baseline_from_top_pt": 44,
+        "single_line": true
+      },
+      {
+        "field": "tagline",
+        "placeholder": "{{tagline}}",
+        "required": false,
+        "font": "body_font",
+        "size_pt": 11,
+        "color": "tagline_gray",
+        "baseline_from_top_pt": 62,
+        "single_line": true
+      }
+    ]
+  },
+
+  "body": {
+    "top_padding_pt": 22,
+    "bottom_padding_pt": 14,
+    "columns": [
+      {
+        "name": "left",
+        "width_ratio": 0.6,
+        "sections": [
+          { "label": "PROBLEM", "field": "problem", "placeholder": "{{problem}}" },
+          { "label": "SOLUTION", "field": "solution", "placeholder": "{{solution}}" },
+          { "label": "WHY NOW", "field": "why_now", "placeholder": "{{why_now}}" },
+          { "label": "BUSINESS MODEL", "field": "business_model", "placeholder": "{{business_model}}" },
+          { "label": "MARKET SIZE", "field": "market_size", "placeholder": "{{market_size}}" }
+        ]
+      },
+      {
+        "name": "right",
+        "width_ratio": 0.4,
+        "sections": [
+          { "label": "TRACTION", "field": "traction", "placeholder": "{{traction}}" },
+          { "label": "TEAM", "field": "team", "placeholder": "{{team}}" },
+          { "label": "STAGE", "field": "stage", "placeholder": "{{stage}}" },
+          { "label": "ASK", "field": "ask", "placeholder": "{{ask}}" },
+          { "label": "KEY RISKS RETIRED", "field": "key_risks_retired", "placeholder": "{{key_risks_retired}}" }
+        ]
+      }
+    ]
+  },
+
+  "footer": {
+    "height_pt": 40,
+    "background": "footer_bg",
+    "font": "body_font",
+    "size_pt": 7,
+    "color": "footer_text",
+    "left_text": "Confidential — For Accredited Investors Only",
+    "right_field": "contact",
+    "right_placeholder": "{{contact}}",
+    "right_max_width_ratio": 0.5
+  },
+
+  "rules": {
+    "empty_fields": "omit_section",
+    "overflow_strategy": "trim_longest_section_then_drop_trailing",
+    "never_shrink_type": true,
+    "ellipsis": "…",
+    "images": "none",
+    "invented_content": "forbidden"
+  }
+}

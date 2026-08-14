@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deckscan"
+version = "0.1.0"
+description = "Pitch deck to one-pager PDF with a deterministic financial red-flag scan."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "TEN Capital" }]
+classifiers = ["Private :: Do Not Upload"]
+
+dependencies = [
+    "pdfplumber>=0.11.4,<0.12",
+    "pypdfium2>=4.30,<5",
+    "Pillow>=10.4,<13",
+    "python-pptx>=1.0.2,<2",
+    "python-docx>=1.1.0,<2",
+    "pytesseract>=0.3.13,<0.4",
+    "openpyxl>=3.1.5,<4",
+    "pandas>=2.2.2,<3",
+    "reportlab>=4.2,<5",
+    "matplotlib>=3.9,<4",
+    "pydantic>=2.8,<3",
+    # >=2.15 for YamlConfigSettingsSource(deep_merge=True), which makes --config
+    # a partial override of the packaged rules.yaml rather than a replacement.
+    "pydantic-settings[yaml]>=2.15,<3",
+    "typer>=0.12,<1",
+    # Claude reads the documents; the rule engine still decides everything.
+    "anthropic>=0.121.0",
+    "python-dotenv>=1.0,<2",
+    # Web app + Railway deployment.
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.30,<1",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2,<9",
+    "pytest-cov>=5.0,<8",
+    "pypdf>=4.3,<7",
+    "ruff>=0.5,<1",
+    "mypy>=1.11,<2",
+    "types-openpyxl",
+    "pandas-stubs",
+]
+
+[project.scripts]
+deckscan = "deckscan.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+deckscan = ["config/*.yaml", "config/*.json", "web_templates/*.html", "py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "ANN"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
+# Depends()/File()/Form() in argument defaults is the FastAPI dependency-injection idiom.
+"src/deckscan/web.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+# These dependencies ship no py.typed marker.
+[[tool.mypy.overrides]]
+module = [
+    "pdfplumber.*",
+    "pytesseract.*",
+    "pptx.*",
+    "docx.*",
+    "reportlab.*",
+    "pypdfium2.*",
+    "openpyxl.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["deckscan"]
+

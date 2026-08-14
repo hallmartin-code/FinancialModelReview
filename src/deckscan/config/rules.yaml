@@ -1,0 +1,858 @@
+# deckscan rule configuration.
+#
+# This file is the single source of truth for every threshold, keyword list,
+# severity default and piece of user-visible text in the tool. Nothing in the
+# Python code may hard-code a number or a label that belongs here.
+#
+# A file passed with --config is an OVERRIDE: it is deep-merged over this one,
+# so it only needs to contain the keys it changes.
+
+version: 1
+
+# --------------------------------------------------------------------------
+# Extraction behaviour
+# --------------------------------------------------------------------------
+extraction:
+  # A page with fewer extracted characters than this is considered image-only
+  # and is routed to OCR when --ocr auto.
+  min_chars_per_page: 120
+  ocr_dpi: 200
+  ocr_lang: eng
+  # Minimum pixel area for an embedded PPTX picture to be worth OCR'ing.
+  min_pptx_image_area_px: 40000
+  # Confidence assigned to values by extraction method.
+  confidence_by_method:
+    cell: 0.95
+    table: 0.85
+    text: 0.70
+    ocr: 0.45
+
+# --------------------------------------------------------------------------
+# Number normalization
+# --------------------------------------------------------------------------
+normalization:
+  currency_symbols:
+    "$": USD
+    "US$": USD
+    "USD": USD
+    "€": EUR
+    "EUR": EUR
+    "£": GBP
+    "GBP": GBP
+  scale_multipliers:
+    k: 1000
+    thousand: 1000
+    m: 1000000
+    mm: 1000000
+    mn: 1000000
+    million: 1000000
+    b: 1000000000
+    bn: 1000000000
+    billion: 1000000000
+  # Bare numbers in a revenue-like row below this magnitude are treated as
+  # scale-ambiguous and reported by UNIT_AMBIGUITY rather than guessed at.
+  bare_number_ambiguity_ceiling: 1000
+
+# --------------------------------------------------------------------------
+# Canonical metric names and the text that identifies them
+# --------------------------------------------------------------------------
+metric_aliases:
+  revenue: ["revenue", "total revenue", "net revenue", "sales", "top line", "bookings"]
+  arr: ["arr", "annual recurring revenue", "annualized recurring revenue", "run rate"]
+  mrr: ["mrr", "monthly recurring revenue"]
+  gross_margin: ["gross margin", "gross profit margin", "gm%", "gm %"]
+  cogs: ["cogs", "cost of goods sold", "cost of revenue", "cost of sales"]
+  opex: ["opex", "operating expenses", "operating expense", "total expenses", "total costs"]
+  burn_monthly: ["monthly burn", "burn rate", "net burn", "gross burn", "cash burn"]
+  runway_months: ["runway", "months of runway", "cash runway"]
+  cash_balance: ["cash balance", "cash on hand", "ending cash", "cash position"]
+  headcount: ["headcount", "fte", "ftes", "employees", "team size", "full-time equivalents"]
+  cac: ["cac", "customer acquisition cost", "cost per acquisition", "cpa"]
+  ltv: ["ltv", "lifetime value", "cltv", "customer lifetime value"]
+  ltv_cac_ratio: ["ltv/cac", "ltv:cac", "ltv to cac", "ltv / cac"]
+  cac_payback_months: ["cac payback", "payback period", "months to payback"]
+  churn_rate: ["churn", "monthly churn", "annual churn", "logo churn", "revenue churn"]
+  retention_rate: ["retention", "net revenue retention", "nrr", "gross retention", "logo retention"]
+  arpu: ["arpu", "average revenue per user", "average revenue per account", "arpa", "acv"]
+  customer_lifetime_months: ["average lifetime", "customer lifetime", "lifetime (months)"]
+  customers: ["customers", "accounts", "logos", "paying customers", "subscribers", "users"]
+  sales_marketing_spend: ["sales & marketing", "sales and marketing", "s&m", "marketing spend"]
+  tam: ["tam", "total addressable market"]
+  sam: ["sam", "serviceable addressable market", "serviceable available market"]
+  som: ["som", "serviceable obtainable market"]
+  raise_ask: ["raising", "raise", "seeking", "the ask", "we are raising", "round size"]
+  valuation: ["valuation", "pre-money", "post-money", "cap", "valuation cap"]
+
+# Metrics shown in the one-pager snapshot strip and used for provenance density.
+headline_metrics: ["arr", "revenue", "gross_margin", "burn_monthly", "runway_months", "ltv_cac_ratio"]
+
+# --------------------------------------------------------------------------
+# Keyword lists
+# --------------------------------------------------------------------------
+keywords:
+  # Presence of any of these (or of an extracted projected revenue series) means
+  # the deck claims financial rigor, which upgrades completeness gaps to flags.
+  financials_section_keywords:
+    ["financials", "financial plan", "financial projections", "projections", "p&l",
+     "profit and loss", "income statement", "unit economics", "financial model",
+     "financial summary", "forecast"]
+  cash_flow_keywords:
+    ["cash flow", "cashflow", "operating cash flow", "free cash flow", "cash balance",
+     "ending cash", "net cash", "cash position"]
+  income_statement_detail_keywords:
+    ["cogs", "cost of goods", "cost of revenue", "gross profit", "gross margin",
+     "operating expenses", "opex breakdown", "ebitda"]
+  balance_sheet_keywords:
+    ["balance sheet", "total assets", "total liabilities", "shareholders equity",
+     "stockholders equity", "working capital"]
+  assumptions_keywords:
+    ["assumptions", "key assumptions", "drivers", "key drivers", "conversion rate",
+     "pricing assumptions", "model inputs"]
+  sensitivity_keywords:
+    ["sensitivity", "scenario", "base case", "bear case", "bull case", "downside case",
+     "upside case", "scenarios"]
+  cap_table_keywords:
+    ["cap table", "capitalization table", "ownership", "prior rounds", "previous rounds",
+     "existing investors", "safe", "convertible note"]
+  use_of_funds_keywords:
+    ["use of funds", "use of proceeds", "allocation of funds", "how we will use"]
+  pricing_keywords:
+    ["pricing", "price point", "per seat", "per month", "subscription price", "list price",
+     "tiers", "pricing model"]
+  tam_methodology_keywords:
+    ["bottom-up", "bottoms-up", "bottom up", "tam methodology", "derived from",
+     "calculated as", "market sizing methodology"]
+  headcount_keywords:
+    ["headcount", "hiring plan", "team growth", "fte", "hires", "org plan", "we will hire"]
+  actual_period_keywords: ["actual", "actuals", "historical", "ttm", "ltm", "reported", "a)"]
+  projected_period_keywords:
+    ["projected", "projection", "forecast", "plan", "estimate", "est.", "e)", "p)", "target"]
+  b2b_keywords:
+    ["b2b", "enterprise", "saas", "mid-market", "procurement", "seats", "acv", "contract value"]
+  b2c_keywords:
+    ["b2c", "consumer", "app store", "d2c", "direct-to-consumer", "subscribers", "mau", "dau"]
+
+# Stage inference. First match in listed order wins.
+stage_keywords:
+  pre_seed: ["pre-seed", "preseed", "pre seed"]
+  seed: ["seed round", "seed stage", "raising seed", "seed financing"]
+  series_a: ["series a"]
+  series_b: ["series b"]
+  series_c: ["series c"]
+  growth: ["growth round", "series d", "series e", "pre-ipo"]
+
+sector_keywords:
+  saas: ["saas", "software as a service", "subscription software"]
+  fintech: ["fintech", "payments", "lending", "banking", "insurtech"]
+  healthtech: ["healthtech", "digital health", "clinical", "patients", "provider", "payor"]
+  biotech: ["biotech", "therapeutic", "preclinical", "fda", "ind ", "phase 1", "phase 2"]
+  marketplace: ["marketplace", "two-sided", "gmv", "take rate"]
+  hardware: ["hardware", "device", "manufacturing", "bill of materials", "bom"]
+  consumer: ["consumer app", "d2c", "direct-to-consumer", "ecommerce", "e-commerce"]
+
+# --------------------------------------------------------------------------
+# Rule thresholds
+# --------------------------------------------------------------------------
+# Growth is ALWAYS a year-over-year multiple: m_t = rev_t / rev_{t-1}.
+# 15% growth is 1.15, never 0.15.
+thresholds:
+  growth:
+    hockey_stick_multiple: 3.0
+    hockey_stick_ratio_vs_actual: 2.0
+    hockey_stick_critical_multiple: 10.0
+    hockey_stick_critical_base_usd: 1000000
+    growth_discontinuity_ratio: 2.0
+    flat_actual_multiple_max: 1.2
+    flat_then_spike_multiple: 3.0
+    market_share_ceiling: 0.15
+
+  burn:
+    min_monthly_cost_per_head: 8000
+    headcount_growth_floor: 1.5
+    opex_growth_floor: 1.2
+    burn_flat_revenue_multiple: 3.0
+    burn_flat_opex_multiple: 1.5
+    runway_mismatch_tolerance: 0.20
+    min_runway_months: 12
+
+  unit_economics:
+    ltv_cac_ceiling: 5.0
+    # stage_guess only selects the ceiling; unknown stage falls back to the value above.
+    ltv_cac_ceiling_by_stage:
+      pre_seed: 4.0
+      seed: 4.0
+      series_a: 5.0
+      series_b: 6.0
+      series_c: 6.0
+      growth: 6.0
+    ltv_cac_critical: 10.0
+    ltv_cac_underwater: 1.0
+    # |LTV - (ARPU x lifetime)| / LTV <= this means LTV was computed on revenue.
+    ltv_revenue_match_tolerance: 0.05
+    ltv_margin_check_gross_margin_max: 0.90
+    max_cac_payback_months:
+      b2b: 18
+      b2c: 12
+      default: 18
+    # CAC declining or flat across the whole plan while volume scales.
+    cac_static_tolerance: 0.02
+    organic_growth_revenue_multiple: 2.0
+    organic_growth_sm_multiple: 1.1
+
+  consistency:
+    value_tolerance: 0.05
+    arithmetic_tolerance: 0.02
+    stale_data_months: 6
+
+  completeness:
+    min_projected_years: 3
+
+# --------------------------------------------------------------------------
+# Scoring
+# --------------------------------------------------------------------------
+scoring:
+  start: 100
+  flag_penalty:
+    critical: -15
+    high: -8
+    medium: -3
+    info: 0
+  gap_penalty:
+    critical: -12
+    high: -4
+    medium: -4
+    info: -4
+  provenance_bonus_max: 10
+  bands:
+    well_grounded_min: 80
+    needs_grounding_min: 50
+  band_labels:
+    well_grounded: "Well grounded"
+    needs_grounding: "Needs grounding"
+    weakly_grounded: "Weakly grounded"
+
+# --------------------------------------------------------------------------
+# Rendering
+# --------------------------------------------------------------------------
+render:
+  max_flags: 8
+  max_grounding_items: 6
+  max_metric_tiles: 6
+  min_chart_periods: 2
+  not_disclosed_label: "not disclosed"
+  overflow_label: "+{count} more in the JSON export"
+  disclaimer: >-
+    Automated screen. Findings are extraction-based and require analyst
+    verification before any investment decision.
+  severity_colors:
+    critical: "#B4232B"
+    high: "#C7761B"
+    medium: "#8A7B1F"
+    info: "#4A5568"
+  text_color: "#1A202C"
+  muted_color: "#4A5568"
+  rule_color: "#CBD5E0"
+  background_color: "#FFFFFF"
+  font_family: "Helvetica"
+  font_size_title: 16
+  font_size_section: 9
+  font_size_body: 8
+  font_size_small: 7
+
+# --------------------------------------------------------------------------
+# Codes that assert an absence, and so may carry no evidence and no numbers.
+# --------------------------------------------------------------------------
+evidence_exempt_codes:
+  - MISSING_CASH_FLOW
+  - MISSING_INCOME_STATEMENT_DETAIL
+  - MISSING_BALANCE_SHEET
+  - MISSING_ASSUMPTIONS_PAGE
+  - NO_SENSITIVITY_CASE
+  - PROJECTION_HORIZON_SHORT
+  - MISSING_CAP_TABLE_OR_PRIOR_RAISES
+  - MISSING_USE_OF_FUNDS
+  - MISSING_PRICING
+  - MISSING_TAM_METHODOLOGY
+  - NO_ACTUALS
+  - NO_HEADCOUNT_PLAN
+
+# --------------------------------------------------------------------------
+# Flag text. `finding` is a format template filled with the actual numbers.
+# --------------------------------------------------------------------------
+rule_text:
+  HOCKEY_STICK_REVENUE:
+    enabled: true
+    severity: high
+    critical_severity: critical
+    title: "Hockey-stick revenue plan"
+    finding: >-
+      Projected revenue growth peaks at {peak_multiple}x in {peak_period}
+      ({implied_cagr}% CAGR across the projection), against trailing actual
+      growth of {actual_multiple}x.
+    why_it_matters: >-
+      A plan whose growth rate steps far above anything the company has
+      demonstrated puts all of the value in periods with no evidence behind them.
+    ask: >-
+      What changes in {peak_period} to take growth from {actual_multiple}x to
+      {peak_multiple}x, and which of those changes is already in motion today?
+
+  GROWTH_DISCONTINUITY:
+    enabled: true
+    severity: high
+    title: "Growth elbow at the actual/projection boundary"
+    finding: >-
+      Growth steps from {last_actual_multiple}x in the last actual period
+      ({last_actual_period}) to {first_projected_multiple}x in the first
+      projected period ({first_projected_period}) - a {ratio}x step change
+      exactly at the boundary between proven and promised.
+    why_it_matters: >-
+      An inflection placed precisely where the evidence stops is the single most
+      diagnostic sign that the plan is fitted to a target rather than derived
+      from the business.
+    ask: >-
+      What specifically happens between {last_actual_period} and
+      {first_projected_period} that has not happened in any prior period?
+
+  FLAT_THEN_SPIKE:
+    enabled: true
+    severity: high
+    title: "Flat history, spiking plan"
+    finding: >-
+      The last actual period grew {last_actual_multiple}x
+      ({last_actual_period}), then the plan calls for {spike_multiple}x in
+      {spike_period}.
+    why_it_matters: >-
+      Flat recent performance followed by a spike implies a step-change the
+      company has not yet demonstrated it can produce.
+    ask: >-
+      What is different about {spike_period} versus {last_actual_period}, and
+      what leading indicator would show that shift starting now?
+
+  UNSUPPORTED_TERMINAL_YEAR:
+    enabled: true
+    severity: high
+    title: "Terminal year implies outsized market share"
+    finding: >-
+      Terminal-year revenue of {terminal_revenue} in {terminal_period} implies
+      {implied_share}% of the stated TAM of {tam}, above the
+      {ceiling_share}% screening ceiling.
+    why_it_matters: >-
+      A terminal year that requires category leadership is a market-share
+      assumption disguised as a revenue projection.
+    ask: >-
+      Which competitors lose the {implied_share}% share you take by
+      {terminal_period}, and what makes that displacement achievable?
+
+  NO_ACTUALS:
+    enabled: true
+    severity: high
+    title: "Projections with no historical periods"
+    finding: >-
+      The deck presents projected periods with no historical or actual period
+      identified anywhere.
+    why_it_matters: >-
+      With no actuals there is no base rate against which to test any assumption
+      in the plan.
+    ask: >-
+      What revenue, if any, has been booked to date, and over what period?
+
+  IMPLAUSIBLY_LOW_BURN:
+    enabled: true
+    severity: high
+    title: "Implied cost per head below plausible floor"
+    finding: >-
+      Monthly burn of {burn} across {headcount} people implies
+      {cost_per_head} per person per month, below the {floor} fully loaded
+      screening floor.
+    why_it_matters: >-
+      Understated burn overstates runway, and the shortfall usually surfaces one
+      or two quarters after the round closes.
+    ask: >-
+      Does the {burn} monthly burn include fully loaded payroll, contractors and
+      benefits for all {headcount} people?
+
+  OPEX_LAGS_HEADCOUNT:
+    enabled: true
+    severity: high
+    title: "Headcount grows faster than cost"
+    finding: >-
+      Planned headcount grows {headcount_multiple}x from {start_period} to
+      {end_period} while opex grows only {opex_multiple}x.
+    why_it_matters: >-
+      Hiring plans that do not show up in the cost line understate the capital
+      required to execute the plan.
+    ask: >-
+      What are the fully loaded costs behind the headcount plan from
+      {start_period} to {end_period}?
+
+  BURN_FLAT_WHILE_REVENUE_SCALES:
+    enabled: true
+    severity: high
+    title: "Costs do not follow the revenue plan"
+    finding: >-
+      Revenue is projected to grow {revenue_multiple}x from {start_period} to
+      {end_period} while opex grows only {opex_multiple}x.
+    why_it_matters: >-
+      Revenue that scales without the cost base scaling assumes operating
+      leverage that has not been demonstrated, and inflates projected margins.
+    ask: >-
+      What cost stays flat while revenue grows {revenue_multiple}x, and why does
+      it not scale with volume?
+
+  RUNWAY_MISMATCH:
+    enabled: true
+    severity: high
+    title: "Stated runway does not reconcile with burn"
+    finding: >-
+      A {raise} raise against {burn} monthly burn computes to
+      {computed_runway} months, against the stated {stated_runway} months
+      - a {delta}% difference.
+    why_it_matters: >-
+      A runway figure that does not follow from the stated burn means either the
+      burn or the runway is wrong, and both drive the size of the round.
+    ask: >-
+      Which is the operative number, the {stated_runway}-month runway or the
+      {burn} monthly burn?
+
+  RUNWAY_TOO_SHORT:
+    enabled: true
+    severity: high
+    title: "Post-raise runway below screening floor"
+    finding: >-
+      Post-raise runway computes to {computed_runway} months, below the
+      {floor}-month floor.
+    why_it_matters: >-
+      A round that does not fund the company to its next milestone is a bridge
+      that will need another bridge.
+    ask: >-
+      What milestone is reached within {computed_runway} months, and what does
+      it unlock for the next round?
+
+  NO_HEADCOUNT_PLAN:
+    enabled: true
+    severity: medium
+    title: "Burn discussed with no headcount plan"
+    finding: >-
+      Burn or opex figures are presented with no headcount or hiring plan
+      anywhere in the materials.
+    why_it_matters: >-
+      Headcount is the dominant driver of burn; without it the cost plan cannot
+      be tested.
+    ask: >-
+      What is the headcount today and the hiring plan by function through the
+      end of the runway?
+
+  LTV_CAC_UNREALISTIC:
+    enabled: true
+    severity: high
+    critical_severity: critical
+    title: "LTV:CAC above plausible range"
+    finding: >-
+      Stated LTV of {ltv} against CAC of {cac} implies a {ratio}x ratio,
+      above the {ceiling}x ceiling used for {stage_label}.
+    why_it_matters: >-
+      Ratios in this range almost always come from an optimistic lifetime
+      assumption or a CAC that excludes a channel.
+    ask: >-
+      Show the derivation of the {ratio}x ratio - what lifetime, margin and
+      fully loaded acquisition cost go into it?
+
+  LTV_CAC_UNDERWATER:
+    enabled: true
+    severity: critical
+    title: "LTV below CAC"
+    finding: >-
+      Stated LTV of {ltv} is below CAC of {cac}, a ratio of {ratio}x.
+    why_it_matters: >-
+      Each additional customer destroys value at the stated economics; growth
+      makes the problem larger, not smaller.
+    ask: >-
+      What changes in price, retention or acquisition cost takes the {ratio}x
+      ratio above 1.0x, and by when?
+
+  LTV_METHOD_UNDISCLOSED:
+    enabled: true
+    severity: high
+    title: "LTV asserted without a derivation"
+    finding: >-
+      LTV of {ltv} is stated with no {missing_inputs} disclosed anywhere in
+      the materials.
+    why_it_matters: >-
+      LTV without its inputs is the most common way customer economics get
+      inflated, and it cannot be checked as presented.
+    ask: >-
+      What gross margin, churn or retention rate, and ARPU produce the {ltv}
+      LTV figure?
+
+  LTV_IGNORES_MARGIN:
+    enabled: true
+    severity: high
+    title: "LTV appears computed on revenue, not gross profit"
+    finding: >-
+      Stated LTV of {ltv} matches ARPU x lifetime ({arpu} x
+      {lifetime_months} months) within {tolerance}%, while gross margin is
+      stated at {gross_margin}%. Margin-adjusted LTV is {adjusted_ltv}.
+    why_it_matters: >-
+      Revenue-based LTV overstates customer value by the whole cost of delivery,
+      and flows straight through into the LTV:CAC ratio.
+    ask: >-
+      Is the {ltv} LTV figure computed on revenue or on gross profit?
+
+  CAC_PAYBACK_LONG:
+    enabled: true
+    severity: high
+    title: "CAC payback beyond screening range"
+    finding: >-
+      CAC payback of {payback_months} months exceeds the {ceiling}-month
+      ceiling applied to {sector_label}.
+    why_it_matters: >-
+      Long payback ties up each dollar of growth capital for longer, so the same
+      round buys materially less growth.
+    ask: >-
+      What brings payback below {ceiling} months, and what has payback been
+      trending at over the last four quarters?
+
+  CHURN_IMPLIES_INFINITE_LIFETIME:
+    enabled: true
+    severity: high
+    title: "Churn or retention implies an unbounded customer lifetime"
+    finding: >-
+      {metric_label} of {value}{unit} is used in the customer economics, which
+      implies customers never leave.
+    why_it_matters: >-
+      Zero churn makes LTV mathematically unbounded, so any LTV derived from it
+      is a choice of horizon rather than a measurement.
+    ask: >-
+      What is the observed churn or retention over the longest cohort you have,
+      and what lifetime does the LTV assume?
+
+  CAC_STATIC_ACROSS_PLAN:
+    enabled: true
+    severity: medium
+    title: "CAC assumed flat or falling while volume scales"
+    finding: >-
+      CAC is held at {cac_start} through {cac_end} from {start_period} to
+      {end_period} while customer volume grows {volume_multiple}x.
+    why_it_matters: >-
+      Acquisition cost normally rises as the best channels saturate; a flat CAC
+      is an assumption, not a forecast.
+    ask: >-
+      Which channels carry the volume growth from {start_period} to
+      {end_period}, and what is CAC by channel today?
+
+  ORGANIC_GROWTH_ASSUMED:
+    enabled: true
+    severity: medium
+    title: "Revenue scales without sales and marketing scaling"
+    finding: >-
+      Revenue grows {revenue_multiple}x from {start_period} to {end_period}
+      while sales and marketing spend grows {sm_multiple}x.
+    why_it_matters: >-
+      Growth that arrives without corresponding go-to-market investment assumes
+      an organic engine that must be evidenced.
+    ask: >-
+      What share of the growth from {start_period} to {end_period} is organic,
+      and what is the evidence for that channel today?
+
+  MISSING_CASH_FLOW:
+    enabled: true
+    severity: critical
+    title: "No cash flow projection"
+    finding: >-
+      The materials present financial projections with no cash flow statement or
+      cash balance by period.
+    why_it_matters: >-
+      Cash, not revenue, determines whether the plan is executable; without it
+      the runway cannot be verified.
+    ask: >-
+      Provide a monthly or quarterly cash flow projection with the closing cash
+      balance for each period.
+
+  MISSING_INCOME_STATEMENT_DETAIL:
+    enabled: true
+    severity: high
+    title: "Revenue shown without cost detail"
+    finding: >-
+      Revenue is presented with no COGS or gross margin, and no opex breakdown.
+    why_it_matters: >-
+      Without the cost lines the revenue plan cannot be converted into a profit
+      or a burn figure.
+    ask: >-
+      Provide the full P&L by period, including COGS, gross margin and opex by
+      function.
+
+  MISSING_BALANCE_SHEET:
+    enabled: true
+    severity: medium
+    title: "No balance sheet"
+    finding: >-
+      No balance sheet or statement of assets and liabilities is present.
+    why_it_matters: >-
+      Existing debt, payables and working capital change the real capital need
+      behind the round.
+    ask: >-
+      Provide a balance sheet as of the most recent close, including any debt
+      and payables.
+
+  MISSING_ASSUMPTIONS_PAGE:
+    enabled: true
+    severity: high
+    title: "No assumptions behind the projections"
+    finding: >-
+      No drivers, pricing or conversion assumptions are shown behind the
+      projections.
+    why_it_matters: >-
+      Projections without stated drivers cannot be stress-tested, only accepted
+      or rejected wholesale.
+    ask: >-
+      Provide the driver assumptions behind the plan - pricing, conversion,
+      volume and retention by period.
+
+  NO_SENSITIVITY_CASE:
+    enabled: true
+    severity: medium
+    title: "Single-scenario plan"
+    finding: >-
+      Only one scenario is presented, with no base or downside case.
+    why_it_matters: >-
+      A single case gives no view of what the company needs if the plan lands
+      short, which is the case that determines the next round.
+    ask: >-
+      What does the downside case look like, and what does it change about the
+      size and timing of this round?
+
+  PROJECTION_HORIZON_SHORT:
+    enabled: true
+    severity: medium
+    title: "Projection horizon under the screening minimum"
+    finding: >-
+      Fewer projected years are presented than the screening minimum.
+    why_it_matters: >-
+      A short horizon hides the period in which the economics of the plan are
+      supposed to turn.
+    ask: >-
+      Extend the projections to cover the full period through the next planned
+      financing.
+
+  MISSING_CAP_TABLE_OR_PRIOR_RAISES:
+    enabled: true
+    severity: high
+    title: "No cap table or prior raise history"
+    finding: >-
+      No capitalization table, prior round history or outstanding instrument
+      summary is present.
+    why_it_matters: >-
+      Prior notes, SAFEs and option pools determine what this round actually
+      buys.
+    ask: >-
+      Provide the current cap table including all outstanding SAFEs, notes,
+      warrants and the option pool.
+
+  MISSING_USE_OF_FUNDS:
+    enabled: true
+    severity: high
+    title: "No use of funds"
+    finding: >-
+      The raise is presented with no line-item use of proceeds.
+    why_it_matters: >-
+      Without a use of funds the round size cannot be tied to the milestone it
+      is meant to reach.
+    ask: >-
+      Provide a line-item use of proceeds mapped to the milestones it funds.
+
+  MISSING_PRICING:
+    enabled: true
+    severity: medium
+    title: "No pricing disclosed"
+    finding: >-
+      No price point, pricing model or tier structure is disclosed.
+    why_it_matters: >-
+      Price is the primary driver of both revenue and unit economics; without it
+      neither can be checked.
+    ask: >-
+      What is the current price per unit or seat, and what discounting is in
+      effect?
+
+  MISSING_TAM_METHODOLOGY:
+    enabled: true
+    severity: medium
+    title: "TAM stated without a derivation"
+    finding: >-
+      A market size figure is stated with no bottom-up derivation.
+    why_it_matters: >-
+      Top-down market figures set no useful bound on the achievable revenue in
+      the plan.
+    ask: >-
+      Show the bottom-up market sizing - units, buyers and price - behind the
+      stated market figure.
+
+  DATA_INCONSISTENCY:
+    enabled: true
+    severity: high
+    title: "Same figure stated two different ways"
+    finding: >-
+      {metric_label} appears as {value_a} at {locator_a} and {value_b} at
+      {locator_b}, a {delta}% difference.
+    why_it_matters: >-
+      Inconsistent headline figures across the materials mean at least one
+      version of the number is wrong, and diligence will find it.
+    ask: >-
+      Which is the correct {metric_label}, {value_a} or {value_b}, and what
+      accounts for the difference?
+
+  ARITHMETIC_ERROR:
+    enabled: true
+    severity: high
+    title: "Stated figure does not match its components"
+    finding: >-
+      {label} is stated as {stated} but the underlying components compute to
+      {computed}, a {delta}% difference.
+    why_it_matters: >-
+      Arithmetic that does not tie suggests the model was edited after the
+      summary was written, and other figures may share the problem.
+    ask: >-
+      Which figure is authoritative, the stated {stated} or the computed
+      {computed}?
+
+  UNIT_AMBIGUITY:
+    enabled: true
+    severity: medium
+    title: "Figures of unclear scale"
+    finding: >-
+      {label} presents values of unclear scale ({examples}); units are mixed or
+      absent.
+    why_it_matters: >-
+      A revenue figure that could be thousands or millions cannot be screened,
+      and the ambiguity often survives into the term sheet.
+    ask: >-
+      Confirm the units and scale used in {label}.
+
+  STALE_DATA:
+    enabled: true
+    severity: medium
+    title: "Most recent actuals are stale"
+    finding: >-
+      The most recent actual period is {last_actual_period}, {months_stale}
+      months before the deck date of {deck_date}.
+    why_it_matters: >-
+      A gap between the last reported period and the raise usually means recent
+      performance is not the story the deck tells.
+    ask: >-
+      What are the actuals for the periods since {last_actual_period}?
+
+# --------------------------------------------------------------------------
+# Gap text. Every rule that cannot evaluate emits one of these.
+# --------------------------------------------------------------------------
+gap_text:
+  cash_flow:
+    severity: critical
+    label: "No cash flow projection"
+    ask: "Provide a cash flow projection with closing cash balance by period."
+  income_statement_detail:
+    severity: high
+    label: "No COGS, gross margin or opex breakdown"
+    ask: "Provide the full P&L by period including COGS and opex by function."
+  balance_sheet:
+    severity: medium
+    label: "No balance sheet"
+    ask: "Provide a balance sheet as of the most recent close."
+  assumptions:
+    severity: high
+    label: "No assumptions behind the projections"
+    ask: "Provide the pricing, conversion and volume drivers behind the plan."
+  sensitivity_case:
+    severity: medium
+    label: "No downside or sensitivity case"
+    ask: "Provide a downside case and what it changes about this round."
+  projection_horizon:
+    severity: medium
+    label: "Projection horizon under 3 years"
+    ask: "Extend projections through the next planned financing."
+  cap_table:
+    severity: high
+    label: "No cap table or prior raises"
+    ask: "Provide the cap table including SAFEs, notes, warrants and option pool."
+  use_of_funds:
+    severity: high
+    label: "No use of funds"
+    ask: "Provide a line-item use of proceeds mapped to milestones."
+  pricing:
+    severity: medium
+    label: "No pricing disclosed"
+    ask: "What is the current price per unit or seat?"
+  tam_methodology:
+    severity: medium
+    label: "No bottom-up market sizing"
+    ask: "Show the bottom-up derivation behind the stated market size."
+  tam:
+    severity: medium
+    label: "No usable TAM figure"
+    ask: "State the TAM with its currency, scale and derivation."
+  revenue_series:
+    severity: high
+    label: "No revenue series extracted"
+    ask: "Provide revenue by period, marking which periods are actuals."
+  actual_periods:
+    severity: high
+    label: "No historical periods identified"
+    ask: "Provide actuals by period for all closed periods to date."
+  projected_periods:
+    severity: medium
+    label: "No projected periods identified"
+    ask: "Provide the revenue plan by period."
+  opex_series:
+    severity: medium
+    label: "No opex or burn series by period"
+    ask: "Provide operating expense by period alongside the revenue plan."
+  headcount:
+    severity: medium
+    label: "No headcount or hiring plan"
+    ask: "What is headcount today and the hiring plan through the runway?"
+  burn_monthly:
+    severity: high
+    label: "No monthly burn disclosed"
+    ask: "What is current net monthly burn, fully loaded?"
+  runway_months:
+    severity: high
+    label: "No runway disclosed"
+    ask: "How many months of runway does this round provide?"
+  raise_ask:
+    severity: high
+    label: "No raise amount disclosed"
+    ask: "How much are you raising, and on what instrument?"
+  cac:
+    severity: medium
+    label: "No CAC disclosed"
+    ask: "What is fully loaded customer acquisition cost today?"
+  ltv:
+    severity: medium
+    label: "No LTV disclosed"
+    ask: "What is customer lifetime value, and how is it derived?"
+  gross_margin:
+    severity: medium
+    label: "No gross margin disclosed"
+    ask: "What is gross margin today and at scale?"
+  churn_or_retention:
+    severity: medium
+    label: "No churn or retention disclosed"
+    ask: "What is churn or net revenue retention on the longest cohort you have?"
+  arpu:
+    severity: medium
+    label: "No ARPU or ACV disclosed"
+    ask: "What is average revenue per account today?"
+  cac_payback:
+    severity: medium
+    label: "No CAC payback period disclosed"
+    ask: "How many months does it take to recover CAC?"
+  sales_marketing_spend:
+    severity: medium
+    label: "No sales and marketing spend by period"
+    ask: "Provide sales and marketing spend by period alongside the revenue plan."
+  deck_date:
+    severity: info
+    label: "No deck date available"
+    ask: "Confirm the as-of date for the figures in this deck."
+  extraction_failure:
+    severity: high
+    label: "Part of the source could not be read"
+    ask: "Provide the materials in a text-based PDF or the underlying model file."
