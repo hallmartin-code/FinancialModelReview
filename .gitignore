@@ -12,3 +12,8 @@ venv/
 htmlcov/
 out/
 *-onepager.pdf
+
+# Secrets. Never commit.
+.env
+.env.*
+!.env.example

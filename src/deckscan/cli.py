@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from dotenv import load_dotenv
 
 from deckscan import __version__
 from deckscan.config import load_config
@@ -34,6 +35,10 @@ from deckscan.pipeline import (
     validate_inputs,
 )
 from deckscan.render.narrative import render_template_skeleton
+
+# The key lives in .env for local runs; on Railway it is a service variable.
+# load_dotenv never overrides a variable already exported in the shell.
+load_dotenv()
 
 EXIT_OK = 0
 EXIT_INPUT_ERROR = 1
