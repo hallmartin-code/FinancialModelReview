@@ -1,8 +1,7 @@
 {
   "template_name": "one_pager",
   "version": "1.0",
-  "description": "Structural template for the single-page investor one-pager. Declares which fields are analyzed in every source document and how each is laid out on the page. Contains no company-specific content: every value here is structure, label, placeholder, or style.",
-
+  "description": "Structural template for the single-page investor one-pager. Declares which fields are analyzed in every source document, how each is laid out, and the red-flag analysis band carried at the foot of the page. Contains no company-specific content: every value here is structure, label, placeholder, or style.",
   "analysis_fields": {
     "company_name": "The company name exactly as written in the source document.",
     "tagline": "One-line positioning statement or descriptor for the company.",
@@ -18,7 +17,6 @@
     "key_risks_retired": "De-risking already achieved: validation, approvals, partnerships.",
     "contact": "Founder or contact name and email address if present in the source document."
   },
-
   "page": {
     "size": "letter",
     "orientation": "portrait",
@@ -28,7 +26,6 @@
     "gutter_pt": 18,
     "max_pages": 1
   },
-
   "palette": {
     "navy": "#1B2A4A",
     "tagline_gray": "#A8B8D0",
@@ -36,9 +33,14 @@
     "footer_bg": "#F4F6F8",
     "footer_text": "#9AA5B4",
     "black": "#000000",
-    "white": "#FFFFFF"
+    "white": "#FFFFFF",
+    "critical": "#B4232B",
+    "high": "#C7761B",
+    "medium": "#8A7B1F",
+    "info": "#4A5568",
+    "band_bg": "#F7F8FA",
+    "band_rule": "#DCE3EB"
   },
-
   "typography": {
     "body_font": "Helvetica",
     "bold_font": "Helvetica-Bold",
@@ -48,7 +50,6 @@
     "label_gap_pt": 3.0,
     "section_gap_pt": 4.0
   },
-
   "header": {
     "height_pt": 80,
     "background": "navy",
@@ -75,7 +76,6 @@
       }
     ]
   },
-
   "body": {
     "top_padding_pt": 22,
     "bottom_padding_pt": 14,
@@ -84,27 +84,66 @@
         "name": "left",
         "width_ratio": 0.6,
         "sections": [
-          { "label": "PROBLEM", "field": "problem", "placeholder": "{{problem}}" },
-          { "label": "SOLUTION", "field": "solution", "placeholder": "{{solution}}" },
-          { "label": "WHY NOW", "field": "why_now", "placeholder": "{{why_now}}" },
-          { "label": "BUSINESS MODEL", "field": "business_model", "placeholder": "{{business_model}}" },
-          { "label": "MARKET SIZE", "field": "market_size", "placeholder": "{{market_size}}" }
+          {
+            "label": "PROBLEM",
+            "field": "problem",
+            "placeholder": "{{problem}}"
+          },
+          {
+            "label": "SOLUTION",
+            "field": "solution",
+            "placeholder": "{{solution}}"
+          },
+          {
+            "label": "WHY NOW",
+            "field": "why_now",
+            "placeholder": "{{why_now}}"
+          },
+          {
+            "label": "BUSINESS MODEL",
+            "field": "business_model",
+            "placeholder": "{{business_model}}"
+          },
+          {
+            "label": "MARKET SIZE",
+            "field": "market_size",
+            "placeholder": "{{market_size}}"
+          }
         ]
       },
       {
         "name": "right",
         "width_ratio": 0.4,
         "sections": [
-          { "label": "TRACTION", "field": "traction", "placeholder": "{{traction}}" },
-          { "label": "TEAM", "field": "team", "placeholder": "{{team}}" },
-          { "label": "STAGE", "field": "stage", "placeholder": "{{stage}}" },
-          { "label": "ASK", "field": "ask", "placeholder": "{{ask}}" },
-          { "label": "KEY RISKS RETIRED", "field": "key_risks_retired", "placeholder": "{{key_risks_retired}}" }
+          {
+            "label": "TRACTION",
+            "field": "traction",
+            "placeholder": "{{traction}}"
+          },
+          {
+            "label": "TEAM",
+            "field": "team",
+            "placeholder": "{{team}}"
+          },
+          {
+            "label": "STAGE",
+            "field": "stage",
+            "placeholder": "{{stage}}"
+          },
+          {
+            "label": "ASK",
+            "field": "ask",
+            "placeholder": "{{ask}}"
+          },
+          {
+            "label": "KEY RISKS RETIRED",
+            "field": "key_risks_retired",
+            "placeholder": "{{key_risks_retired}}"
+          }
         ]
       }
     ]
   },
-
   "footer": {
     "height_pt": 40,
     "background": "footer_bg",
@@ -116,7 +155,6 @@
     "right_placeholder": "{{contact}}",
     "right_max_width_ratio": 0.5
   },
-
   "rules": {
     "empty_fields": "omit_section",
     "overflow_strategy": "trim_longest_section_then_drop_trailing",
@@ -124,5 +162,29 @@
     "ellipsis": "…",
     "images": "none",
     "invented_content": "forbidden"
+  },
+  "analysis": {
+    "label": "RED FLAG ANALYSIS",
+    "grounding_label": "NEEDS GROUNDING",
+    "height_pt": 168,
+    "top_padding_pt": 12,
+    "inner_padding_pt": 14,
+    "background": "band_bg",
+    "rule_color": "band_rule",
+    "max_flags": 4,
+    "max_grounding_items": 3,
+    "severity_colors": {
+      "critical": "critical",
+      "high": "high",
+      "medium": "medium",
+      "info": "info"
+    },
+    "chip_width_pt": 38,
+    "flag_leading_pt": 9.5,
+    "empty_label": "No red flags fired on the extracted figures.",
+    "overflow_label": "plus {count} more in the financial screen",
+    "score_label": "GROUNDING",
+    "placeholder_flag": "{{red_flag}}",
+    "placeholder_grounding": "{{needs_grounding}}"
   }
 }

@@ -12,7 +12,16 @@ from importlib import resources
 
 import pytest
 
-REQUIRED_SECTIONS = ("analysis_fields", "page", "palette", "typography", "header", "body", "footer")
+REQUIRED_SECTIONS = (
+    "analysis_fields",
+    "page",
+    "palette",
+    "typography",
+    "header",
+    "body",
+    "footer",
+    "analysis",
+)
 
 
 @pytest.fixture(scope="module")
@@ -75,9 +84,23 @@ def test_layout_fits_one_page(template):
         template["header"]["height_pt"]
         + body["top_padding_pt"]
         + body["bottom_padding_pt"]
+        + template["analysis"]["height_pt"]
         + template["footer"]["height_pt"]
     )
+    # The bands are fixed furniture; what is left is what the narrative may use.
     assert used < page["height_pt"]
+    assert page["height_pt"] - used > 200, "no usable room left for the narrative"
+
+
+def test_analysis_band_is_declared(template):
+    band = template["analysis"]
+    assert band["max_flags"] >= 1
+    assert band["max_grounding_items"] >= 1
+    assert set(band["severity_colors"]) == {"critical", "high", "medium", "info"}
+    for name in band["severity_colors"].values():
+        assert name in template["palette"], name
+    assert band["background"] in template["palette"]
+    assert band["rule_color"] in template["palette"]
 
 
 def test_template_carries_no_company_content(template):

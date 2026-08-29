@@ -7,7 +7,10 @@ Upload a pitch deck. Get two investor documents back:
    triggered them, and a ranked list of what needs grounding.
 2. **Investor one-pager** — problem, solution, why now, business model, market
    size, traction, team, stage, ask, and risks retired, laid out to the standard
-   TEN Capital template.
+   TEN Capital template, with a red-flag analysis band at the foot of the page:
+   the narrative above is what the company says, the band is what the numbers
+   show. Top flags with their figures, the grounding score, and the three
+   questions that would settle the most load-bearing claims.
 
 Both are single-page PDFs. Runs as a CLI or as a web app on Railway.
 

@@ -119,3 +119,110 @@ def test_screen_shows_not_disclosed_rather_than_zero(settings, fields, tmp_path)
     text = PdfReader(str(out)).pages[0].extract_text()
     assert settings.render.not_disclosed_label in text
     assert "$0" not in text
+
+
+HOCKEY_STICK_REPORT = {
+    "narrative": NARRATIVE,
+    "periods": [
+        ("FY2024", "actual"),
+        ("FY2025", "actual"),
+        ("FY2026", "projected"),
+        ("FY2027", "projected"),
+    ],
+    "series": [
+        ("revenue", "FY2024", "1000000"),
+        ("revenue", "FY2025", "1150000"),
+        ("revenue", "FY2026", "9200000"),
+        ("revenue", "FY2027", "46000000"),
+        ("opex", "FY2024", "3000000"),
+        ("opex", "FY2027", "3400000"),
+    ],
+    "metrics": [
+        ("burn_monthly", "60000", "USD"),
+        ("headcount", "22", "people"),
+        ("cac", "400", "USD"),
+        ("ltv", "9000", "USD"),
+    ],
+    "claims": {"has_cash_flow": False},
+}
+
+
+def test_investor_report_carries_the_red_flag_analysis(settings, fields, tmp_path):
+    """The four checks the brief names must reach the investor report itself."""
+    analysis = analyze(settings, fields, make_payload(**HOCKEY_STICK_REPORT))
+    out = render_narrative(analysis, tmp_path / "report.pdf", settings=settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+
+    assert "RED FLAG ANALYSIS" in text
+    assert "NEEDS GROUNDING" in text
+    assert "GROUNDING" in text and "/100" in text
+    # Severity is a word as well as a colour, so the page survives grayscale.
+    assert "CRITICAL" in text or "HIGH" in text
+    # The narrative it sits under is still there.
+    assert "PROBLEM" in text and "Northwind Analytics" in text
+
+
+def test_report_flags_quote_their_numbers(settings, fields, tmp_path):
+    analysis = analyze(settings, fields, make_payload(**HOCKEY_STICK_REPORT))
+    out = render_narrative(analysis, tmp_path / "report.pdf", settings=settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+    band = text.split("RED FLAG ANALYSIS")[1]
+    assert any(char.isdigit() for char in band)
+    assert "22.5x" in band or "8.0x" in band or "1.1x" in band
+
+
+def test_report_says_how_many_flags_it_could_not_show(settings, fields, tmp_path):
+    analysis = analyze(settings, fields, make_payload(**HOCKEY_STICK_REPORT))
+    assert len(analysis.flags) > 4, "fixture should overflow the band"
+    out = render_narrative(analysis, tmp_path / "report.pdf", settings=settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+    assert "more in the financial screen" in text
+
+
+def test_report_with_flags_is_still_one_page(settings, fields, tmp_path):
+    analysis = analyze(settings, fields, make_payload(**HOCKEY_STICK_REPORT))
+    out = render_narrative(analysis, tmp_path / "report.pdf", settings=settings)
+    assert _pages(out) == 1
+
+
+def test_clean_report_says_so_rather_than_leaving_the_band_blank(settings, fields, tmp_path):
+    clean = make_payload(
+        narrative=NARRATIVE,
+        claims=dict.fromkeys(
+            [
+                "has_cash_flow",
+                "has_income_statement_detail",
+                "has_balance_sheet",
+                "has_assumptions",
+                "has_sensitivity_case",
+                "has_cap_table",
+                "has_use_of_funds",
+                "has_pricing",
+                "has_tam_methodology",
+                "has_headcount_plan",
+            ],
+            True,
+        ),
+    )
+    analysis = analyze(settings, fields, clean)
+    out = render_narrative(analysis, tmp_path / "clean.pdf", settings=settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+    assert "No red flags fired" in text
+
+
+def test_skeleton_shows_the_analysis_band_placeholders(tmp_path):
+    out = render_template_skeleton(tmp_path / "template.pdf")
+    text = PdfReader(str(out)).pages[0].extract_text()
+    assert "RED FLAG ANALYSIS" in text
+    assert "{{red_flag}}" in text
+    assert "{{needs_grounding}}" in text
+
+
+def test_grounding_list_never_repeats_a_subject(settings, fields):
+    """A completeness flag and its gap must not take two of the slots."""
+    from deckscan.analyze.scoring import grounding_items
+
+    analysis = analyze(settings, fields, make_payload(**HOCKEY_STICK_REPORT))
+    items = grounding_items(analysis, settings)
+    claims = [item.claim.lower() for item in items]
+    assert len(claims) == len(set(claims)), claims

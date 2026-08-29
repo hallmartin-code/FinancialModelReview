@@ -163,7 +163,7 @@ def render_outputs(
 ) -> tuple[Path, Path]:
     """Write both PDFs and return their paths."""
     render_onepager(analysis, onepager_path, settings, sources=sources)
-    render_narrative(analysis, narrative_path)
+    render_narrative(analysis, narrative_path, settings=settings)
     return onepager_path, narrative_path
 
 

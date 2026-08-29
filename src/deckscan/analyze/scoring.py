@@ -90,13 +90,19 @@ def grounding_items(analysis: DeckAnalysis, settings: Settings) -> list[Groundin
 
     items.sort(key=lambda item: (SEVERITY_RANK[item.severity], not item.load_bearing, item.code))
 
-    # One line per distinct question; a flag and its gap often ask the same thing.
-    seen: set[str] = set()
+    # One line per distinct subject. A completeness flag and its gap describe the
+    # same hole in the same words but ask for it slightly differently, so match on
+    # the claim as well as the question - otherwise the missing cash flow burns two
+    # of the six slots and pushes a real finding off the page.
+    seen_claims: set[str] = set()
+    seen_asks: set[str] = set()
     deduped: list[GroundingItem] = []
     for item in items:
-        key = item.substantiation.lower()
-        if key in seen:
+        claim = item.claim.strip().lower()
+        ask = item.substantiation.strip().lower()
+        if claim in seen_claims or ask in seen_asks:
             continue
-        seen.add(key)
+        seen_claims.add(claim)
+        seen_asks.add(ask)
         deduped.append(item)
     return deduped[: settings.render.max_grounding_items]
