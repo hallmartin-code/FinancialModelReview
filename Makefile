@@ -16,8 +16,8 @@ test:
 	$(VENV_BIN)/python -m pytest --cov=deckscan --cov-report=term-missing
 
 lint:
-	$(VENV_BIN)/python -m ruff check src tests
-	$(VENV_BIN)/python -m ruff format --check src tests
+	$(VENV_BIN)/python -m ruff check src tests tools
+	$(VENV_BIN)/python -m ruff format --check src tests tools
 
 typecheck:
 	$(VENV_BIN)/python -m mypy

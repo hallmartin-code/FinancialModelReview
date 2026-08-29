@@ -58,7 +58,13 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-deckscan = ["config/*.yaml", "config/*.json", "web_templates/*.html", "py.typed"]
+deckscan = [
+    "config/*.yaml",
+    "config/*.json",
+    "web_templates/*.html",
+    "static/*.png",
+    "py.typed",
+]
 
 [tool.ruff]
 line-length = 100

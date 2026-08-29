@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -57,9 +58,13 @@ ERROR_HEADINGS = {
 }
 
 TEMPLATE_DIR = Path(__file__).parent / "web_templates"
+STATIC_DIR = Path(__file__).parent / "static"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 app = FastAPI(title="deckscan", docs_url=None, redoc_url=None)
+# Icons and other assets. Deliberately outside the password gate: a browser
+# fetches the favicon before the user has authenticated.
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 _executor = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="deck")
 _jobs: dict[str, Job] = {}
@@ -211,6 +216,12 @@ def _run_job(job: Job, deck_path: Path, model_path: Path | None) -> None:
         job.stage, job.status = "Complete", "done"
     except Exception as exc:  # a failed run must still explain itself
         job.status, job.error = "error", f"{type(exc).__name__}: {exc}"
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Browsers ask for this path by name even when a <link> points elsewhere."""
+    return FileResponse(STATIC_DIR / "favicon.png", media_type="image/png")
 
 
 @app.get("/healthz")

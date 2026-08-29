@@ -136,3 +136,27 @@ def test_password_gate_when_app_password_is_set(monkeypatch):
 def test_open_by_default(monkeypatch):
     monkeypatch.delenv("APP_PASSWORD", raising=False)
     assert client.get("/").status_code == 200
+
+
+def test_favicon_png_is_served():
+    response = client.get("/static/favicon.png")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_every_linked_icon_exists():
+    """A <link> pointing at a missing file is a 404 on every page load."""
+    import re
+
+    page = client.get("/").text
+    hrefs = re.findall(r'<link[^>]+rel="(?:icon|apple-touch-icon)"[^>]+href="([^"]+)"', page)
+    assert hrefs, "the page links no icons"
+    for href in hrefs:
+        assert client.get(href).status_code == 200, href
+
+
+def test_bare_favicon_ico_path_resolves():
+    response = client.get("/favicon.ico")
+    assert response.status_code == 200
+    assert response.content[:8] == b"\x89PNG\r\n\x1a\n"
