@@ -19,3 +19,9 @@ fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1
 python-multipart>=0.0.9
 jinja2>=3.1,<4
+
+# Install the project itself. Without this line the dependencies land but the
+# `deckscan` package does not: the src/ layout keeps it off sys.path, so
+# `uvicorn deckscan.web:app` fails with ModuleNotFoundError and the container
+# never binds to $PORT. Keep this last so the pins above resolve first.
+.

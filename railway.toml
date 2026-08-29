@@ -4,6 +4,8 @@ builder = "NIXPACKS"
 [deploy]
 startCommand = "uvicorn deckscan.web:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/healthz"
-healthcheckTimeout = 30
+# Cold start imports matplotlib, pandas and pdfplumber before the first
+# request; 30s was not enough headroom on a small container.
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
