@@ -183,6 +183,15 @@ class DeckAnalysis(BaseModel):
                 return value
         return None
 
+    def nothing_extracted(self) -> bool:
+        """True when no figure, series or narrative line was read from any source.
+
+        The distinction matters on the page: a deck with no flags is not the same
+        as a deck nobody could read, and rendering them identically would present
+        a failed run as a clean one.
+        """
+        return not self.metrics and not self.series and not any((self.narrative or {}).values())
+
     def counts_by_severity(self) -> dict[str, int]:
         """Flag counts keyed by severity, including zero entries, ranked order."""
         return {sev: sum(1 for f in self.flags if f.severity == sev) for sev in SEVERITY_RANK}

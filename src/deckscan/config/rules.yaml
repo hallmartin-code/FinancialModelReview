@@ -240,6 +240,11 @@ render:
   max_metric_tiles: 6
   min_chart_periods: 2
   not_disclosed_label: "not disclosed"
+  no_flags_label: "No red flags fired on the extracted figures."
+  # Shown instead of no_flags_label when the source could not be read at all.
+  unread_label: >-
+    Nothing could be extracted from the source, so no rule could be evaluated.
+    This is not a clean result - it is an unread one.
   overflow_label: "+{count} more in the JSON export"
   disclaimer: >-
     Automated screen. Findings are extraction-based and require analyst

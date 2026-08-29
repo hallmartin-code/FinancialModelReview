@@ -83,7 +83,7 @@ def render_onepager(
     y = _draw_tiles(canvas, theme, analysis, y - SECTION_GAP)
     if plan.chart is not None:
         y = _draw_chart(canvas, theme, plan.chart, y - SECTION_GAP)
-    y = _draw_flags(canvas, theme, settings, plan, y - SECTION_GAP)
+    y = _draw_flags(canvas, theme, settings, analysis, plan, y - SECTION_GAP)
     y = _draw_grounding(canvas, theme, plan.grounding, y - SECTION_GAP)
     _draw_gaps(canvas, theme, analysis, y - SECTION_GAP)
     _draw_footer(canvas, theme, settings, analysis, sources or [])
@@ -346,17 +346,24 @@ def _draw_flags(
     canvas: pdfcanvas.Canvas,
     theme: Theme,
     settings: Settings,
+    analysis: DeckAnalysis,
     plan: _Plan,
     y: float,
 ) -> float:
     y = _section_label(canvas, theme, "Red flags", y)
     if not plan.flags:
-        canvas.setFillColor(theme.muted)
+        # "No red flags" and "nothing could be read" must never look the same:
+        # one is a result, the other is the absence of one.
+        unread = analysis.nothing_extracted()
+        message = settings.render.unread_label if unread else settings.render.no_flags_label
+        canvas.setFillColor(theme.severity_color("critical") if unread else theme.muted)
         canvas.setFont(theme.body_font, theme.size_body)
-        canvas.drawString(
-            MARGIN, y - theme.size_body, "No red flags fired on the extracted figures."
-        )
-        return y - theme.size_body - LINE_GAP
+        for line in wrap(
+            " ".join(message.split()), theme.body_font, theme.size_body, theme.content_width
+        ):
+            y -= theme.size_body + LINE_GAP
+            canvas.drawString(MARGIN, y, line)
+        return y - LINE_GAP
 
     for flag in sorted(plan.flags, key=lambda f: (SEVERITY_RANK[f.severity], f.code)):
         colour = theme.severity_color(flag.severity)

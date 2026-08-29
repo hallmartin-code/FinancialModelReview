@@ -140,6 +140,8 @@ class RenderConfig(_Frozen):
     max_metric_tiles: int
     min_chart_periods: int
     not_disclosed_label: str
+    no_flags_label: str
+    unread_label: str
     overflow_label: str
     disclaimer: str
     severity_colors: dict[str, str]

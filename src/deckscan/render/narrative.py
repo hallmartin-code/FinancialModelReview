@@ -167,8 +167,10 @@ def _draw_header(
     width = PAGE_W - 2 * margin
     for element in header["elements"]:
         text = _value(analysis, element["field"], placeholders, str(element.get("placeholder", "")))
-        if not text and element.get("required") and placeholders:
-            text = str(element.get("placeholder", ""))
+        if not text and element.get("required"):
+            # A required line never renders blank: an empty navy band reads as a
+            # branded cover page rather than as a report that found nothing.
+            text = str(element.get("placeholder" if placeholders else "fallback", ""))
         if not text:
             continue
         font = _font(template, element["font"])
@@ -202,6 +204,10 @@ def _draw_body(
     )
     available = top_y - bottom_y
 
+    if not placeholders and analysis.nothing_extracted():
+        _draw_empty_state(canvas, template, top_y, PAGE_W - 2 * margin, margin)
+        return
+
     x = margin
     for column in columns:
         width = usable * float(column["width_ratio"])
@@ -210,6 +216,41 @@ def _draw_body(
         )
         _draw_column(canvas, template, x, top_y, width, blocks)
         x += width + gutter
+
+
+def _draw_empty_state(
+    canvas: pdfcanvas.Canvas,
+    template: dict[str, Any],
+    top_y: float,
+    width: float,
+    margin: float,
+) -> None:
+    """Say plainly that nothing was read, where the narrative would have been."""
+    state = template["empty_state"]
+    typography = template["typography"]
+    label_font = _font(template, "bold_font")
+    body_font = _font(template, "body_font")
+    label_size = float(typography["label_size_pt"]) + 2
+    content_size = float(typography["content_size_pt"])
+    leading = float(typography["content_leading_pt"])
+
+    y = top_y
+    canvas.setFillColor(_color(template, str(state["color"])))
+    canvas.setFont(label_font, label_size)
+    canvas.drawString(margin, y - label_size, str(state["label"]))
+    y -= label_size + 10
+
+    canvas.setFillColor(_color(template, "black"))
+    canvas.setFont(body_font, content_size)
+    for line in wrap(str(state["body"]), body_font, content_size, width):
+        y -= leading
+        canvas.drawString(margin, y, line)
+
+    y -= leading
+    canvas.setFillColor(_color(template, "label_gray"))
+    for line in wrap(str(state["hint"]), body_font, content_size, width):
+        y -= leading
+        canvas.drawString(margin, y, line)
 
 
 def _layout_column(
@@ -347,9 +388,13 @@ def _draw_analysis(
         ]
 
     if not rows:
-        canvas.setFillColor(_color(template, "label_gray"))
+        unread = not placeholders and analysis.nothing_extracted()
+        message = str(band["unread_label"] if unread else band["empty_label"])
+        canvas.setFillColor(_color(template, "critical" if unread else "label_gray"))
         canvas.setFont(body_font, content_size)
-        canvas.drawString(margin, y - content_size, str(band["empty_label"]))
+        canvas.drawString(
+            margin, y - content_size, fit_line(message, body_font, content_size, width)
+        )
         y -= content_size + leading
     for severity, title, finding in rows:
         colour_key = band["severity_colors"].get(severity, "info")

@@ -62,7 +62,8 @@
         "size_pt": 28,
         "color": "white",
         "baseline_from_top_pt": 44,
-        "single_line": true
+        "single_line": true,
+        "fallback": "Company not identified"
       },
       {
         "field": "tagline",
@@ -185,6 +186,13 @@
     "overflow_label": "plus {count} more in the financial screen",
     "score_label": "GROUNDING",
     "placeholder_flag": "{{red_flag}}",
-    "placeholder_grounding": "{{needs_grounding}}"
+    "placeholder_grounding": "{{needs_grounding}}",
+    "unread_label": "Nothing was extracted, so no rule could be evaluated. This is not a clean result."
+  },
+  "empty_state": {
+    "label": "NOTHING COULD BE READ FROM THIS DECK",
+    "body": "No figures, periods or narrative text were extracted, so no red flag could fire and no claim could be checked. The absence of findings below is not a clean bill of health - it is the absence of a reading.",
+    "hint": "Everything the analysis still needs is listed below.",
+    "color": "critical"
   }
 }

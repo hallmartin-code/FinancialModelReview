@@ -226,3 +226,84 @@ def test_grounding_list_never_repeats_a_subject(settings, fields):
     items = grounding_items(analysis, settings)
     claims = [item.claim.lower() for item in items]
     assert len(claims) == len(set(claims)), claims
+
+
+def _unread(settings, fields):
+    """An analysis where extraction produced nothing at all.
+
+    Mirrors the live failure: nothing read, so nothing claims financial rigor
+    either, and no completeness flag can fire.
+    """
+    analysis = analyze(settings, fields, make_payload(claims={"claims_financial_rigor": False}))
+    assert analysis.nothing_extracted()
+    assert not analysis.flags, "the unread path fires no rules"
+    return analysis
+
+
+def test_unread_report_is_not_a_branded_blank_page(settings, fields, tmp_path):
+    """A deck nobody could read must say so, not render as a logo over a void."""
+    analysis = _unread(settings, fields)
+    out = render_narrative(analysis, tmp_path / "unread.pdf", settings=settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+
+    assert "NOTHING COULD BE READ FROM THIS DECK" in text
+    assert "not a clean bill of health" in text
+    # The header never renders empty.
+    assert "Company not identified" in text
+    # And the reader still gets the list of what is needed.
+    assert "NEEDS GROUNDING" in text
+
+
+def test_unread_report_does_not_claim_a_clean_result(settings, fields, tmp_path):
+    analysis = _unread(settings, fields)
+    out = render_narrative(analysis, tmp_path / "unread.pdf", settings=settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+    assert "No red flags fired" not in text
+    assert "not a clean result" in text
+
+
+def test_unread_screen_does_not_claim_a_clean_result(settings, fields, tmp_path):
+    analysis = _unread(settings, fields)
+    out = render_onepager(analysis, tmp_path / "unread-screen.pdf", settings)
+    text = PdfReader(str(out)).pages[0].extract_text()
+    assert "No red flags fired" not in text
+    assert "unread one" in text or "no rule could be evaluated" in text
+
+
+def test_unread_documents_are_still_one_page(settings, fields, tmp_path):
+    analysis = _unread(settings, fields)
+    report = render_narrative(analysis, tmp_path / "a.pdf", settings=settings)
+    screen = render_onepager(analysis, tmp_path / "b.pdf", settings)
+    assert _pages(report) == 1
+    assert _pages(screen) == 1
+
+
+def test_a_deck_that_was_read_with_no_flags_still_reads_as_clean(settings, fields, tmp_path):
+    """The clean case must keep its own wording, not borrow the unread one."""
+    clean = make_payload(
+        narrative=NARRATIVE,
+        claims=dict.fromkeys(
+            [
+                "has_cash_flow",
+                "has_income_statement_detail",
+                "has_balance_sheet",
+                "has_assumptions",
+                "has_sensitivity_case",
+                "has_cap_table",
+                "has_use_of_funds",
+                "has_pricing",
+                "has_tam_methodology",
+                "has_headcount_plan",
+            ],
+            True,
+        ),
+    )
+    analysis = analyze(settings, fields, clean)
+    assert not analysis.nothing_extracted()
+    text = (
+        PdfReader(str(render_narrative(analysis, tmp_path / "clean.pdf", settings=settings)))
+        .pages[0]
+        .extract_text()
+    )
+    assert "No red flags fired" in text
+    assert "NOTHING COULD BE READ" not in text
