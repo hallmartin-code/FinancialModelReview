@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}TEN Capital Network — {{ job.company or job.deck_name }}{% endblock %}
+{% block title %}TEN Capital Network — {{ job.company or job.source_name }}{% endblock %}
 {% block content %}
 
 <div class="card">
   <div class="eyebrow is-working" id="eyebrow">Analyzing</div>
-  <h1 id="heading">{{ job.company or job.deck_name }}</h1>
+  <h1 id="heading">{{ job.company or job.source_name }}</h1>
   <p class="lede" id="lede">
-    Claude is reading the deck, then the rule engine scores it. This usually takes
-    under a minute.
+    Claude is reading the documents, then the rule engine scores them. This usually
+    takes under a minute.
   </p>
 
   <ul class="steps" id="steps">
@@ -21,8 +21,8 @@
   </div>
 
   <div class="notice warn" id="warning" style="display:none">
-    <span><b>The deck could not be read.</b> <span id="warning-text"></span>
-    These PDFs record what is missing, not what the deck says.</span>
+    <span><b>The upload could not be read.</b> <span id="warning-text"></span>
+    These PDFs record what is missing, not what the source says.</span>
   </div>
 
   <div id="results" {% if job.status != 'done' %}style="display:none"{% endif %}>
@@ -42,14 +42,14 @@
     </div>
   </div>
 
-  <a class="backlink" href="/">&larr; Analyze another deck</a>
+  <a class="backlink" href="/">&larr; Analyze something else</a>
 </div>
 
 {% endblock %}
 {% block scripts %}
 <script>
 const jobId = {{ job.id | tojson }};
-const LABELS = ["Reading the deck", "Running the rule engine", "Rendering the one-pagers"];
+const LABELS = ["Reading the documents", "Running the rule engine", "Rendering the one-pagers"];
 
 const DOC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.6"
   stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/>

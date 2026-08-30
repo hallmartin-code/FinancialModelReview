@@ -43,7 +43,7 @@ def test_index_carries_the_brand_and_offers_every_supported_type():
     assert "brand-mark" in response.text
     for suffix in (".pdf", ".pptx", ".docx"):
         assert suffix in response.text
-    for suffix in (".xlsx", ".csv"):
+    for suffix in (".xlsx", ".xlsm", ".csv"):
         assert suffix in response.text
 
 
@@ -59,6 +59,61 @@ def test_upload_without_a_key_is_refused(deck_bytes):
     response = client.post("/jobs", files={"deck": ("deck.pdf", deck_bytes, "application/pdf")})
     assert response.status_code == 503
     assert "ANTHROPIC_API_KEY" in response.json()["detail"]
+
+
+@pytest.fixture
+def model_bytes():
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Period", "Revenue"])
+    sheet.append(["FY2025", 1200000])
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_a_model_with_no_deck_is_accepted(monkeypatch, model_bytes):
+    """A spreadsheet on its own is a complete run, not a missing deck."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    response = client.post(
+        "/jobs",
+        files={"model": ("model.xlsx", model_bytes, XLSX_MEDIA)},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+
+def test_the_job_page_for_a_model_only_run_is_titled_by_the_model(monkeypatch, model_bytes):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    created = client.post(
+        "/jobs",
+        files={"model": ("northwind-model.xlsx", model_bytes, XLSX_MEDIA)},
+        follow_redirects=False,
+    )
+    page = client.get(created.headers["location"]).text
+    assert "northwind-model.xlsx" in page
+
+
+def test_an_upload_with_neither_file_is_rejected(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    response = client.post("/jobs", files={"deck": ("", b"", "application/pdf")})
+    assert response.status_code == 400
+    assert "this run had neither" in response.json()["detail"]
+
+
+def test_a_model_in_the_deck_slot_is_rejected(monkeypatch, model_bytes):
+    """The two fields stay distinct; the model has its own dropzone."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    response = client.post("/jobs", files={"deck": ("model.xlsx", model_bytes, XLSX_MEDIA)})
+    assert response.status_code == 400
+    assert "Unsupported deck type" in response.json()["detail"]
 
 
 def test_unsupported_deck_type_is_rejected(monkeypatch, deck_bytes):
@@ -97,6 +152,13 @@ def test_empty_upload_is_rejected(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     response = client.post("/jobs", files={"deck": ("deck.pdf", b"", "application/pdf")})
     assert response.status_code == 400
+
+
+def test_the_form_offers_the_model_as_a_standalone_source():
+    """The dropzone must not still read 'optional' now that it is sufficient."""
+    page = client.get("/").text
+    assert "enough on its own" in page
+    assert 'name="deck"' in page and "required" not in page.split('name="deck"')[1][:200]
 
 
 def test_an_unreadable_deck_finishes_with_a_warning_not_a_clean_result(monkeypatch, deck_bytes):

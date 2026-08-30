@@ -1,6 +1,6 @@
 # deckscan
 
-Upload a pitch deck. Get two investor documents back:
+Upload a pitch deck, a financial model, or both. Get two investor documents back:
 
 1. **Financial screen** — grounding score, metric tiles, an actuals-vs-projections
    revenue chart, red flags that quote the numbers and page references that
@@ -17,10 +17,16 @@ Both are single-page PDFs. Runs as a CLI or as a web app on Railway.
 ## How it works
 
 ```
-deck .pdf/.pptx/.docx ─┐
-                       ├─►  Claude Opus 5  ─►  merge  ─►  rule engine  ─►  two PDFs
-model .xlsx/.csv ──────┘     (reads)          (Python)     (Python)
+deck .pdf/.pptx/.docx ─────┐
+                           ├─►  Claude Opus 5  ─►  merge  ─►  rule engine  ─►  two PDFs
+model .xlsx/.xlsm/.csv ────┘     (reads)          (Python)     (Python)
 ```
+
+Either input is enough on its own. A spreadsheet with no deck is a complete run:
+every figure carries its `Sheet!C14` cell reference into the flags exactly as a
+deck's figures carry their page, and the narrative one-pager falls back to
+whatever prose the workbook itself states — a cover sheet's company name and
+positioning line — rendering the rest as gaps rather than inventing it.
 
 **Claude reads; Python decides.** Claude extracts figures, periods, and narrative
 text — each with the page, slide, or cell it came from — and returns them as
@@ -35,6 +41,11 @@ PDFs are sent to Claude as native document blocks, so charts, tables, and
 image-only slides are read from the page itself — no OCR install required. PPTX
 and DOCX decks are flattened to text with slide/page markers first, so pictures
 inside them are not read; supply those as PDF when the charts carry the numbers.
+Workbooks are flattened the same way, one line per populated row, so a chart
+drawn on a sheet is not read — its underlying cells are.
+
+Legacy `.xls`, `.ppt`, `.doc`, Keynote and Numbers files are refused with a note
+saying which format to export instead.
 
 ## Install
 
@@ -55,21 +66,32 @@ Python 3.12+.
 ## CLI
 
 ```bash
-deckscan analyze DECK.pdf [--model MODEL.xlsx] [--out SCREEN.pdf]
+deckscan analyze SOURCE [--model MODEL.xlsx] [--out SCREEN.pdf]
                  [--narrative ONEPAGER.pdf] [--json ANALYSIS.json]
                  [--company "Name"] [--config PATH] [--strict] [-v]
 
 deckscan template --out onepager-template.pdf   # blank structural template
 ```
 
+`SOURCE` is a deck (`.pdf`, `.pptx`, `.docx`) **or** a financial model (`.xlsx`,
+`.xlsm`, `.csv`):
+
+```bash
+deckscan analyze deck.pdf                      # deck only
+deckscan analyze model.xlsx                    # model only
+deckscan analyze deck.pdf --model model.xlsx   # both
+```
+
 Both PDFs are written on every run. `--model` is authoritative: where the model
 and the deck disagree by more than 5%, the model's figure is used *and* a
-`DATA_INCONSISTENCY` flag names both values with their locations.
+`DATA_INCONSISTENCY` flag names both values with their locations. Passing a
+spreadsheet as `SOURCE` and another to `--model` is an error — there is no deck
+for the second one to be authoritative over.
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Analysis produced (including a deck that could not be read, which yields a report full of gaps) |
-| 1 | Unrecoverable input error (missing file, unsupported extension) |
+| 1 | Unrecoverable input error (missing file, unsupported extension, two spreadsheets and no deck) |
 | 2 | `--strict` and at least one CRITICAL flag fired |
 
 ## Web app
@@ -78,8 +100,8 @@ and the deck disagree by more than 5%, the model's figure is used *and* a
 uvicorn deckscan.web:app --reload --port 8000
 ```
 
-Drag a deck onto the dropzone (and optionally a model), watch the three-step
-progress, download both PDFs and the full JSON. Uploads run as background jobs;
+Drag a deck onto the dropzone, a model onto the second one, or either by itself,
+watch the three-step progress, download both PDFs and the full JSON. Uploads run as background jobs;
 files and results are deleted after `JOB_TTL_SECONDS` (default one hour).
 
 The interface uses the TEN Capital Network design system — dark navy card, the

@@ -31,8 +31,8 @@ from deckscan.pipeline import (
     InputError,
     default_output_paths,
     render_outputs,
+    resolve_inputs,
     run_analysis,
-    validate_inputs,
 )
 from deckscan.render.narrative import render_template_skeleton
 
@@ -55,7 +55,10 @@ app = typer.Typer(
     name="deckscan",
     add_completion=False,
     no_args_is_help=True,
-    help="Pitch deck to investor one-pagers, with a deterministic financial red-flag scan.",
+    help=(
+        "Pitch deck or financial model to investor one-pagers, with a deterministic "
+        "financial red-flag scan."
+    ),
 )
 
 
@@ -85,10 +88,15 @@ def _print_summary(analysis: DeckAnalysis, paths: dict[str, Path | None]) -> Non
 
 @app.command()
 def analyze(
-    deck_path: Annotated[Path, typer.Argument(help="Pitch deck: .pdf or .pptx")],
+    source_path: Annotated[
+        Path,
+        typer.Argument(help="Pitch deck (.pdf/.pptx/.docx) or financial model (.xlsx/.xlsm/.csv)."),
+    ],
     model: Annotated[
         Path | None,
-        typer.Option("--model", help="Financial model (.xlsx/.csv). Authoritative when present."),
+        typer.Option(
+            "--model", help="Financial model (.xlsx/.xlsm/.csv). Authoritative when present."
+        ),
     ] = None,
     out: Annotated[
         Path | None,
@@ -125,9 +133,9 @@ def analyze(
         typer.Option("--verbose", "-v", help="Print methodology notes to stderr."),
     ] = False,
 ) -> None:
-    """Analyze a pitch deck and emit both investor one-pagers."""
+    """Analyze a pitch deck, a financial model, or both, and emit both one-pagers."""
     try:
-        validate_inputs(deck_path, model)
+        deck_path, model_path = resolve_inputs(source_path, model)
         settings = load_config(config)
     except InputError as exc:
         _echo_err(f"error: {exc}")
@@ -144,18 +152,18 @@ def analyze(
 
     request = AnalysisRequest(
         deck_path=deck_path,
-        model_path=model,
+        model_path=model_path,
         company_override=company,
         ocr_mode=ocr.value,
         settings=settings,
     )
     analysis = run_analysis(request)
 
-    default_screen, default_narrative = default_output_paths(deck_path)
+    default_screen, default_narrative = default_output_paths(source_path)
     screen_path = out or default_screen
     narrative_path = narrative or default_narrative
 
-    sources = [deck_path.name] + ([model.name] if model else [])
+    sources = [p.name for p in (deck_path, model_path) if p is not None]
     render_outputs(analysis, settings, screen_path, narrative_path, sources)
 
     if json_out is not None:

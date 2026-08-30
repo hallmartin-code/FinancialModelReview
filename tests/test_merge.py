@@ -100,3 +100,23 @@ def test_normalizer_reads_the_shapes_that_slip_through(settings):
     assert to_decimal("not disclosed", settings) is None
     assert to_decimal("", settings) is None
     assert to_decimal(None, settings) is None
+
+
+def test_a_model_only_run_supplies_the_narrative(settings, fields):
+    """With no deck, the workbook's own prose is the only narrative there is."""
+    model = make_payload(
+        narrative={"company_name": "Northwind Analytics", "problem": "Ops teams fly blind."},
+        metrics=[("arr", "1200000", "USD")],
+        locator="Model!B4",
+        method="cell",
+    )
+    analysis = _build(settings, fields, None, model)
+    assert analysis.company == "Northwind Analytics"
+    assert analysis.narrative["problem"] == "Ops teams fly blind."
+
+
+def test_the_deck_still_owns_the_narrative_when_both_are_present(settings, fields):
+    deck = make_payload(narrative={"company_name": "Northwind Analytics"})
+    model = make_payload(narrative={"company_name": "Sheet1"}, locator="Model!B4", method="cell")
+    analysis = _build(settings, fields, deck, model)
+    assert analysis.company == "Northwind Analytics"

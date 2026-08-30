@@ -97,10 +97,14 @@ def build_analysis(
     if model_payload is not None:
         payloads.append(("model", model_payload))
 
-    # --- narrative and header fields (deck only; a model has no narrative) ----
+    # --- narrative and header fields ----------------------------------------
+    # The deck is the narrative source when there is one. A model-only run falls
+    # back to the workbook: cover sheets and assumption tabs often carry a company
+    # name, an ask, and a line of positioning, and those beat rendering blanks.
     narrative: dict[str, str] = dict.fromkeys(narrative_fields, "")
-    if deck_payload is not None:
-        raw = deck_payload.get("narrative")
+    narrative_source = deck_payload if deck_payload is not None else model_payload
+    if narrative_source is not None:
+        raw = narrative_source.get("narrative")
         if isinstance(raw, dict):
             for field in narrative_fields:
                 narrative[field] = clean_text(raw.get(field))

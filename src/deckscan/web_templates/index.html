@@ -3,11 +3,11 @@
 
 <form class="card" action="/jobs" method="post" enctype="multipart/form-data" id="upload-form">
   <div class="eyebrow">Deck Analyzer</div>
-  <h1>Pitch Deck<span class="arrow">&rarr;</span><span class="to">Investor One&#8209;Pager</span></h1>
+  <h1>Deck or Model<span class="arrow">&rarr;</span><span class="to">Investor One&#8209;Pager</span></h1>
   <p class="lede">
-    Upload a pitch deck and get two single-page PDFs: a polished investor one-pager,
-    and a financial screen whose red flags are computed from the numbers Claude
-    found — each one citing the page it came from.
+    Upload a pitch deck, a financial model, or both, and get two single-page PDFs: a
+    polished investor one-pager, and a financial screen whose red flags are computed
+    from the numbers Claude found — each one citing the page or cell it came from.
   </p>
 
   {% if api_key_missing %}
@@ -33,7 +33,7 @@
       &nbsp;·&nbsp; up to {{ max_mb }}&nbsp;MB
     </div>
     <input class="file-input" type="file" id="deck-upload" name="deck"
-           accept="{{ deck_accept }}" required>
+           accept="{{ deck_accept }}">
   </label>
 
   <label class="dropzone secondary" for="model-upload" data-dropzone>
@@ -43,7 +43,7 @@
       </svg>
     </div>
     <div>
-      <div class="dropzone-title" data-label>Financial model — optional</div>
+      <div class="dropzone-title" data-label>Financial model — enough on its own</div>
       <div class="dropzone-sub" data-sub>
         {% for ext in model_extensions %}<b>{{ ext }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}
         &nbsp;·&nbsp; authoritative where it and the deck disagree
@@ -52,6 +52,10 @@
     <input class="file-input" type="file" id="model-upload" name="model"
            accept="{{ model_accept }}">
   </label>
+
+  <div class="notice" id="nothing-chosen" style="display:none">
+    <span>Choose a pitch deck or a financial model — a run needs at least one.</span>
+  </div>
 
   <button class="cta" type="submit" id="submit"
           {% if api_key_missing %}disabled{% endif %}>Generate one-pager PDF</button>
@@ -96,7 +100,19 @@ document.querySelectorAll("[data-dropzone]").forEach(zone => {
   });
 });
 
-document.getElementById("upload-form").addEventListener("submit", () => {
+// Either file is enough, which is more than `required` on one input can express.
+document.getElementById("upload-form").addEventListener("submit", event => {
+  const chosen = ["deck-upload", "model-upload"].some(id => {
+    const input = document.getElementById(id);
+    return input.files && input.files.length;
+  });
+  const complaint = document.getElementById("nothing-chosen");
+  if (!chosen) {
+    event.preventDefault();
+    complaint.style.display = "flex";
+    return;
+  }
+  complaint.style.display = "none";
   const button = document.getElementById("submit");
   button.disabled = true;
   button.textContent = "Uploading…";

@@ -69,9 +69,9 @@ def prepare_deck(path: Path, settings: Settings) -> SourceContent:
 
 
 def prepare_model(path: Path) -> SourceContent:
-    """Prepare a .xlsx or .csv financial model."""
+    """Prepare a .xlsx, .xlsm or .csv financial model."""
     suffix = path.suffix.lower()
-    if suffix == ".xlsx":
+    if suffix in {".xlsx", ".xlsm"}:
         return _prepare_xlsx(path)
     if suffix == ".csv":
         return _prepare_csv(path)

@@ -1,4 +1,7 @@
-"""FastAPI front end: upload a deck, get both one-pagers.
+"""FastAPI front end: upload a deck and/or a financial model, get both one-pagers.
+
+Either upload is enough on its own: a spreadsheet with no deck is a complete run
+whose financial screen is computed from the workbook's own figures.
 
 A run makes one or two Claude calls over a whole deck and can take minutes, so
 uploads are handled as background jobs: the browser is redirected to a job page
@@ -45,12 +48,12 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 JOB_TTL_SECONDS = int(os.environ.get("JOB_TTL_SECONDS", "3600"))
 MAX_WORKERS = int(os.environ.get("WEB_MAX_WORKERS", "2"))
 
-STAGE_READ = "Reading the deck"
+STAGE_READ = "Reading the documents"
 STAGE_RULES = "Running the rule engine"
 STAGE_RENDER = "Rendering the one-pagers"
 
 ERROR_HEADINGS = {
-    400: "That deck can't be processed",
+    400: "That upload can't be processed",
     401: "Not authorized",
     404: "Nothing here",
     413: "That file is too large",
@@ -96,7 +99,7 @@ class Job:
     """One run: its inputs, its progress, and the artifacts it produced."""
 
     id: str
-    deck_name: str
+    deck_name: str | None
     model_name: str | None
     workdir: Path
     created_at: float = field(default_factory=time.monotonic)
@@ -113,6 +116,11 @@ class Job:
     screen_path: Path | None = None
     narrative_path: Path | None = None
     json_path: Path | None = None
+
+    @property
+    def source_name(self) -> str:
+        """What to call this run before the company name is known."""
+        return self.deck_name or self.model_name or "Upload"
 
     def steps(self) -> list[dict[str, str]]:
         labels = [STAGE_READ, STAGE_RULES, STAGE_RENDER]
@@ -170,7 +178,7 @@ def _get_job(job_id: str) -> Job:
     return job
 
 
-def _run_job(job: Job, deck_path: Path, model_path: Path | None) -> None:
+def _run_job(job: Job, deck_path: Path | None, model_path: Path | None) -> None:
     """Execute one run end to end. Runs on a worker thread; never raises."""
     try:
         settings = load_config()
@@ -191,7 +199,7 @@ def _run_job(job: Job, deck_path: Path, model_path: Path | None) -> None:
         if any(gap.field == "extraction_failure" for gap in analysis.gaps):
             job.warning = next(
                 (note for note in analysis.methodology if note.startswith("Extraction failed")),
-                "The deck could not be read, so this report is gaps only.",
+                "The upload could not be read, so this report is gaps only.",
             )
 
         job.stage = STAGE_RULES
@@ -205,7 +213,7 @@ def _run_job(job: Job, deck_path: Path, model_path: Path | None) -> None:
         stem = "_".join(stem.split())
         screen = job.workdir / f"{stem}_screen.pdf"
         narrative = job.workdir / f"{stem}_one_pager.pdf"
-        sources = [job.deck_name] + ([job.model_name] if job.model_name else [])
+        sources = [name for name in (job.deck_name, job.model_name) if name]
         render_outputs(analysis, settings, screen, narrative, sources)
         job.screen_path, job.narrative_path = screen, narrative
 
@@ -267,60 +275,73 @@ def index(request: Request, _: None = Depends(require_access)) -> Any:
     )
 
 
+async def _read_upload(upload: UploadFile, noun: str, allowed: frozenset[str]) -> tuple[bytes, str]:
+    """Validate one uploaded file and return its bytes and normalized suffix."""
+    suffix = Path(upload.filename or "").suffix.lower()
+    if suffix not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported {noun} type '{suffix or upload.filename}'. "
+            f"Supported: {', '.join(sorted(allowed))}",
+        )
+    payload = await upload.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail=f"The uploaded {noun} is empty.")
+    if len(payload) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"The {noun} exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)}MB upload limit.",
+        )
+    return payload, suffix
+
+
 @app.post("/jobs")
 async def create_job(
-    deck: UploadFile = File(...),
+    deck: UploadFile | None = File(None),
     model: UploadFile | None = File(None),
     _: None = Depends(require_access),
 ) -> RedirectResponse:
     if not api_key_present():
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY is not configured.")
 
-    deck_suffix = Path(deck.filename or "").suffix.lower()
-    if deck_suffix not in DECK_SUFFIXES:
+    # Either field on its own is a complete run, so neither is required and the
+    # "nothing at all" case is what gets rejected.
+    deck_bytes: bytes | None = None
+    model_bytes: bytes | None = None
+    deck_name: str | None = None
+    model_name: str | None = None
+    deck_suffix = model_suffix = ""
+
+    if deck is not None and deck.filename:
+        deck_name = deck.filename
+        deck_bytes, deck_suffix = await _read_upload(deck, "deck", DECK_SUFFIXES)
+    if model is not None and model.filename:
+        model_name = model.filename
+        model_bytes, model_suffix = await _read_upload(model, "model", MODEL_SUFFIXES)
+    if deck_bytes is None and model_bytes is None:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported deck type '{deck_suffix or deck.filename}'. "
-            f"Supported: {', '.join(sorted(DECK_SUFFIXES))}",
+            detail="Upload a pitch deck, a financial model, or both — this run had neither.",
         )
-    payload = await deck.read()
-    if not payload:
-        raise HTTPException(status_code=400, detail="The uploaded deck is empty.")
-    if len(payload) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Deck exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)}MB upload limit.",
-        )
-
-    model_bytes: bytes | None = None
-    model_suffix = ""
-    if model is not None and model.filename:
-        model_suffix = Path(model.filename).suffix.lower()
-        if model_suffix not in MODEL_SUFFIXES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported model type '{model_suffix}'. "
-                f"Supported: {', '.join(sorted(MODEL_SUFFIXES))}",
-            )
-        model_bytes = await model.read()
-        if len(model_bytes or b"") > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="The model file is too large.")
 
     _sweep_expired()
     job_id = uuid.uuid4().hex
     workdir = Path(tempfile.mkdtemp(prefix=f"deckscan-{job_id[:8]}-"))
-    deck_path = workdir / f"deck{deck_suffix}"
-    deck_path.write_bytes(payload)
+
+    deck_path: Path | None = None
+    if deck_bytes is not None:
+        deck_path = workdir / f"deck{deck_suffix}"
+        deck_path.write_bytes(deck_bytes)
 
     model_path: Path | None = None
-    if model_bytes:
+    if model_bytes is not None:
         model_path = workdir / f"model{model_suffix}"
         model_path.write_bytes(model_bytes)
 
     job = Job(
         id=job_id,
-        deck_name=deck.filename or f"deck{deck_suffix}",
-        model_name=(model.filename if model and model.filename else None),
+        deck_name=deck_name,
+        model_name=model_name,
         workdir=workdir,
     )
     with _jobs_lock:
