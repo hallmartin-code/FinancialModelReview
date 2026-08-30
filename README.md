@@ -100,8 +100,10 @@ for the second one to be authoritative over.
 uvicorn deckscan.web:app --reload --port 8000
 ```
 
-Drag a deck onto the dropzone, a model onto the second one, or either by itself,
-watch the three-step progress, download both PDFs and the full JSON. Uploads run as background jobs;
+Drag a deck **or a spreadsheet** onto the main dropzone — it takes either, and a
+spreadsheet dropped there is read as the financial model. Use the second dropzone
+only to pair a model with a deck. Then watch the three-step progress and download
+both PDFs and the full JSON. Uploads run as background jobs;
 files and results are deleted after `JOB_TTL_SECONDS` (default one hour).
 
 The interface uses the TEN Capital Network design system — dark navy card, the

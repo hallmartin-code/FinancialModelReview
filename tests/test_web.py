@@ -108,12 +108,38 @@ def test_an_upload_with_neither_file_is_rejected(monkeypatch):
     assert "this run had neither" in response.json()["detail"]
 
 
-def test_a_model_in_the_deck_slot_is_rejected(monkeypatch, model_bytes):
-    """The two fields stay distinct; the model has its own dropzone."""
+def test_a_spreadsheet_dropped_on_the_main_zone_is_routed_to_the_model(monkeypatch, model_bytes):
+    """The first dropzone takes everything; an .xlsx there is a model, not an error."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
-    response = client.post("/jobs", files={"deck": ("model.xlsx", model_bytes, XLSX_MEDIA)})
+    created = client.post(
+        "/jobs",
+        files={"deck": ("northwind.xlsx", model_bytes, XLSX_MEDIA)},
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    state = client.get(f"/api{created.headers['location']}").json()
+    assert state["deck"] is None
+    assert state["model"] == "northwind.xlsx"
+
+
+def test_two_spreadsheets_and_no_deck_are_rejected(monkeypatch, model_bytes):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    response = client.post(
+        "/jobs",
+        files={
+            "deck": ("a.xlsx", model_bytes, XLSX_MEDIA),
+            "model": ("b.xlsx", model_bytes, XLSX_MEDIA),
+        },
+    )
     assert response.status_code == 400
-    assert "Unsupported deck type" in response.json()["detail"]
+    assert "Two spreadsheets" in response.json()["detail"]
+
+
+def test_the_main_dropzone_advertises_spreadsheets(monkeypatch):
+    """The accept filter must not hide .xlsx from the file picker."""
+    page = client.get("/").text
+    accept = page.split('name="deck"')[1].split('accept="')[1].split('"')[0]
+    assert ".xlsx" in accept and ".pdf" in accept
 
 
 def test_unsupported_deck_type_is_rejected(monkeypatch, deck_bytes):
@@ -155,9 +181,9 @@ def test_empty_upload_is_rejected(monkeypatch):
 
 
 def test_the_form_offers_the_model_as_a_standalone_source():
-    """The dropzone must not still read 'optional' now that it is sufficient."""
+    """The main dropzone must say it takes a model, and require nothing."""
     page = client.get("/").text
-    assert "enough on its own" in page
+    assert "drop a deck or model here" in page
     assert 'name="deck"' in page and "required" not in page.split('name="deck"')[1][:200]
 
 

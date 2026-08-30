@@ -27,9 +27,9 @@
         <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/>
       </svg>
     </div>
-    <div class="dropzone-title" data-label>Click or drop a deck here</div>
+    <div class="dropzone-title" data-label>Click or drop a deck or model here</div>
     <div class="dropzone-sub" data-sub>
-      {% for ext in deck_extensions %}<b>{{ ext }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}
+      {% for ext in source_extensions %}<b>{{ ext }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}
       &nbsp;·&nbsp; up to {{ max_mb }}&nbsp;MB
     </div>
     <input class="file-input" type="file" id="deck-upload" name="deck"
@@ -43,7 +43,7 @@
       </svg>
     </div>
     <div>
-      <div class="dropzone-title" data-label>Financial model — enough on its own</div>
+      <div class="dropzone-title" data-label>Financial model — to pair with a deck</div>
       <div class="dropzone-sub" data-sub>
         {% for ext in model_extensions %}<b>{{ ext }}</b>{% if not loop.last %} &middot; {% endif %}{% endfor %}
         &nbsp;·&nbsp; authoritative where it and the deck disagree

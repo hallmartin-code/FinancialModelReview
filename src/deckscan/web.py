@@ -267,7 +267,8 @@ def index(request: Request, _: None = Depends(require_access)) -> Any:
             "api_key_missing": not api_key_present(),
             "deck_extensions": sorted(DECK_SUFFIXES),
             "model_extensions": sorted(MODEL_SUFFIXES),
-            "deck_accept": ",".join(sorted(DECK_SUFFIXES)),
+            "source_extensions": sorted(DECK_SUFFIXES | MODEL_SUFFIXES),
+            "deck_accept": ",".join(sorted(DECK_SUFFIXES | MODEL_SUFFIXES)),
             "model_accept": ",".join(sorted(MODEL_SUFFIXES)),
             "max_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
             "ttl_minutes": max(1, JOB_TTL_SECONDS // 60),
@@ -303,6 +304,20 @@ async def create_job(
 ) -> RedirectResponse:
     if not api_key_present():
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY is not configured.")
+
+    # The first dropzone is the one people drop everything onto. A spreadsheet
+    # landing there is a financial model, not a malformed deck, so it is routed
+    # to the model slot exactly as the CLI routes a spreadsheet source argument.
+    if deck is not None and Path(deck.filename or "").suffix.lower() in MODEL_SUFFIXES:
+        if model is not None and model.filename:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Two spreadsheets were uploaded ({deck.filename} and {model.filename}) "
+                    "and no deck. Upload one of them on its own."
+                ),
+            )
+        deck, model = None, deck
 
     # Either field on its own is a complete run, so neither is required and the
     # "nothing at all" case is what gets rejected.
