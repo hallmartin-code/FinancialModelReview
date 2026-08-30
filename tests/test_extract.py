@@ -11,7 +11,12 @@ from reportlab.pdfgen import canvas
 
 from deckscan.extract import claude as claude_module
 from deckscan.extract.schema import extraction_schema
-from deckscan.extract.source import prepare_deck, prepare_model
+from deckscan.extract.source import (
+    MAX_TEXT_CHARS,
+    _fair_shares,
+    prepare_deck,
+    prepare_model,
+)
 
 
 def _walk_objects(node: Any) -> list[dict[str, Any]]:
@@ -182,3 +187,144 @@ def test_missing_key_is_a_clear_error(settings, fields, pdf_path):
     content = prepare_deck(pdf_path, settings)
     with pytest.raises(claude_module.ExtractionError, match="ANTHROPIC_API_KEY"):
         claude_module.extract(content, settings, fields)
+
+
+# --- workbooks: every tab, not just the first ---------------------------------
+
+
+def _workbook(tmp_path, name, tabs, hidden=(), formulas=None):
+    """Build a workbook from ``{title: [row, ...]}`` and return its path."""
+    from openpyxl import Workbook
+
+    path = tmp_path / name
+    book = Workbook()
+    for index, (title, rows) in enumerate(tabs.items()):
+        sheet = book.active if index == 0 else book.create_sheet()
+        sheet.title = title
+        for row in rows:
+            sheet.append(row)
+        if title in hidden:
+            sheet.sheet_state = "hidden"
+    for title, cells in (formulas or {}).items():
+        sheet = book.create_sheet(title)
+        for ref, formula in cells.items():
+            sheet[ref] = formula
+    book.save(str(path))
+    return path
+
+
+def test_every_tab_reaches_the_request(tmp_path):
+    """A model's numbers live on later tabs as often as the first one."""
+    path = _workbook(
+        tmp_path,
+        "model.xlsx",
+        {
+            "Cover": [["Northwind Analytics"]],
+            "P&L": [["", "FY2024"], ["Revenue", 1200000]],
+            "Cash Flow": [["Ending cash", 800000]],
+            "Cap Table": [["Founders", 0.62]],
+        },
+    )
+    content = prepare_model(path)
+    text = content.inline_text or ""
+    for title in ("Cover", "P&L", "Cash Flow", "Cap Table"):
+        assert f"[sheet {title}]" in text
+    assert "800000" in text and "0.62" in text
+
+
+def test_the_methodology_names_every_tab_it_read(tmp_path):
+    """'Did it read my tabs?' has to be answerable from the report itself."""
+    path = _workbook(
+        tmp_path,
+        "model.xlsx",
+        {"Cover": [["Northwind"]], "P&L": [["Revenue", 1200000]], "Notes": []},
+    )
+    note = " ".join(prepare_model(path).methodology)
+    assert "Cover" in note and "P&L" in note
+    assert "Notes" in note  # an empty tab is named as empty, not silently dropped
+
+
+def test_hidden_tabs_are_read_and_disclosed(tmp_path):
+    path = _workbook(
+        tmp_path,
+        "model.xlsx",
+        {"P&L": [["Revenue", 1200000]], "Backup": [["CAC", 4200]]},
+        hidden=("Backup",),
+    )
+    content = prepare_model(path)
+    assert "4200" in (content.inline_text or "")
+    assert any("Hidden tabs" in note and "Backup" in note for note in content.methodology)
+
+
+def test_no_tab_is_dropped_when_the_workbook_exceeds_the_budget(tmp_path):
+    """The bug this guards: tab 1 eats the budget and later tabs vanish unread."""
+    titles = [f"Tab{n:02d}" for n in range(1, 13)]
+    rows = [
+        [f"Line item {r} with a fairly long label", 1234567, 2345678, 3456789] for r in range(900)
+    ]
+    path = _workbook(tmp_path, "big.xlsx", dict.fromkeys(titles, rows))
+
+    content = prepare_model(path)
+    text = content.inline_text or ""
+    assert len(text) > MAX_TEXT_CHARS // 2, "the budget should actually be under pressure"
+    assert len(text) <= MAX_TEXT_CHARS, "the hard ceiling still holds"
+    missing = [t for t in titles if f"[sheet {t}]" not in text]
+    assert not missing, f"tabs dropped entirely: {missing}"
+    assert any("clipped" in note for note in content.methodology)
+
+
+def test_one_huge_tab_does_not_clip_the_small_ones(tmp_path):
+    """Cash Flow is two rows; a 9000-row Detail tab must not cost it its place."""
+    huge = [[f"Line item {r} with a fairly long label", 1234567, 2345678] for r in range(9000)]
+    path = _workbook(
+        tmp_path,
+        "lopsided.xlsx",
+        {
+            "Detail": huge,
+            "Cash Flow": [["Ending cash", 800000]],
+            "Use of Funds": [["Engineering", 1500000]],
+        },
+    )
+    content = prepare_model(path)
+    text = content.inline_text or ""
+    assert "Ending cash" in text and "1500000" in text
+    assert "[sheet Detail]" in text
+    clipped = [note for note in content.methodology if "clipped" in note]
+    assert clipped and "Detail" in clipped[0]
+    assert "Cash Flow" not in clipped[0], "a small tab should never need clipping"
+
+
+def test_formula_tabs_with_no_cached_values_are_explained(tmp_path):
+    """Otherwise a tab of live formulas looks like a tab that states nothing."""
+    path = _workbook(
+        tmp_path,
+        "model.xlsx",
+        {"P&L": [["Revenue", 1200000]]},
+        formulas={"Calc": {"A1": "Gross margin", "B1": "=1-0.35"}},
+    )
+    content = prepare_model(path)
+    note = " ".join(content.methodology)
+    assert "no cached results" in note and "Calc" in note
+    assert "re-save" in note
+
+
+def test_an_all_empty_workbook_fails_with_its_tab_count(tmp_path):
+    path = _workbook(tmp_path, "empty.xlsx", {"Sheet1": [], "Sheet2": []})
+    content = prepare_model(path)
+    assert content.failed
+    assert "2 tab(s)" in " ".join(content.methodology)
+
+
+def test_xlsm_workbooks_read_the_same_way(tmp_path):
+    path = _workbook(tmp_path, "model.xlsm", {"P&L": [["Revenue", 1200000]]})
+    content = prepare_model(path)
+    assert not content.failed
+    assert "[sheet P&L]" in (content.inline_text or "")
+
+
+def test_fair_shares_gives_every_tab_room():
+    """Small entries keep their full size; the surplus goes to the large ones."""
+    shares = _fair_shares([10, 10, 1000], 300)
+    assert shares[0] == 10 and shares[1] == 10
+    assert shares[2] == 280
+    assert sum(shares) <= 300

@@ -44,6 +44,18 @@ inside them are not read; supply those as PDF when the charts carry the numbers.
 Workbooks are flattened the same way, one line per populated row, so a chart
 drawn on a sheet is not read — its underlying cells are.
 
+**Every tab is read, not just the first.** Hidden tabs included. The request
+budget is split across the tabs max-min fair, so a 9,000-row `Detail` sheet
+cannot crowd a two-row `Cash Flow` tab out of the request: small tabs always
+arrive whole and only oversized ones are clipped. The methodology section names
+every tab it read, every tab that was empty, and every tab it had to clip and by
+how much — so "did it read my Cap Table tab?" is answerable from the report.
+
+Formula cells are read as the values Excel cached for them. A workbook saved by a
+tool rather than by Excel can carry formulas with no cached result; those figures
+cannot be read, and the methodology names the tabs affected rather than letting
+them look like tabs that state nothing. Opening and re-saving in Excel fixes it.
+
 Legacy `.xls`, `.ppt`, `.doc`, Keynote and Numbers files are refused with a note
 saying which format to export instead.
 

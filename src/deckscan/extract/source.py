@@ -314,7 +314,129 @@ def _column_letter(index: int) -> str:
     return letters
 
 
+@dataclass
+class _SheetRead:
+    """One tab as it came off the workbook, before any budgeting."""
+
+    title: str
+    hidden: bool
+    rows: list[str]
+    numeric_cells: int
+
+    def block(self, rows: list[str] | None = None) -> str:
+        body = self.rows if rows is None else rows
+        return f"[sheet {self.title}]\n" + "\n".join(body)
+
+    @property
+    def size(self) -> int:
+        return len(self.block())
+
+
+def _read_sheet(sheet: Any) -> tuple[list[str], int]:
+    """One tab's populated rows as ``A1=value`` lines, and how many held numbers."""
+    rows: list[str] = []
+    numeric = 0
+    for row_index, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        cells: list[str] = []
+        for col, value in enumerate(row, start=1):
+            if value is None or str(value).strip() == "":
+                continue
+            if isinstance(value, int | float) and not isinstance(value, bool):
+                numeric += 1
+            cells.append(f"{_column_letter(col)}{row_index}={value}")
+        if cells:
+            rows.append("  ".join(cells))
+    return rows, numeric
+
+
+def _fair_shares(sizes: list[int], budget: int) -> list[int]:
+    """Split ``budget`` across ``sizes``, max-min fair.
+
+    A tab that fits inside an equal share keeps all of its text, and what it does
+    not use is redistributed to the larger tabs. This is what stops a long first
+    sheet from spending the whole request and pushing later tabs out entirely:
+    every tab in the workbook reaches Claude, even if a huge one arrives clipped.
+    """
+    shares = [0] * len(sizes)
+    pending = set(range(len(sizes)))
+    left = budget
+    while pending:
+        share = left // len(pending)
+        fitting = {index for index in pending if sizes[index] <= share}
+        if not fitting:
+            for index in pending:
+                shares[index] = share
+            break
+        for index in fitting:
+            shares[index] = sizes[index]
+            left -= sizes[index]
+        pending -= fitting
+    return shares
+
+
+#: Room held back from a clipped tab's allowance for the "further rows" marker.
+_MARKER_RESERVE = 80
+
+
+def _trim_to(sheet: _SheetRead, allowance: int) -> tuple[str, int]:
+    """The tab's block clipped to ``allowance`` characters on whole-row boundaries."""
+    kept: list[str] = []
+    used = len(f"[sheet {sheet.title}]")
+    for row in sheet.rows:
+        if used + 1 + len(row) > allowance - _MARKER_RESERVE:
+            break
+        kept.append(row)
+        used += 1 + len(row)
+    if not kept:  # never emit a bare header; one row is what proves the tab exists
+        kept = sheet.rows[:1]
+
+    def render(shown: list[str]) -> str:
+        dropped = len(sheet.rows) - len(shown)
+        marker = [f"[... {dropped} further rows on this tab not shown]"] if dropped else []
+        return sheet.block([*shown, *marker])
+
+    # A long first row or a long marker can still overshoot; give rows back until it fits.
+    while len(kept) > 1 and len(render(kept)) > allowance:
+        kept.pop()
+    return render(kept), len(kept)
+
+
+def _formula_cell_counts(path: Path, titles: set[str]) -> dict[str, int]:
+    """Formula cells on the named tabs, read as formulas rather than cached values.
+
+    Only called for tabs that produced no numbers at all, to tell "this tab is
+    prose" apart from "this tab is formulas whose results were never cached".
+    """
+    if not titles:
+        return {}
+    try:
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(str(path), data_only=False, read_only=True)
+    except Exception:
+        return {}
+    counts: dict[str, int] = {}
+    try:
+        for sheet in workbook.worksheets:
+            if sheet.title not in titles:
+                continue
+            found = sum(
+                1
+                for row in sheet.iter_rows(values_only=True)
+                for value in row
+                if isinstance(value, str) and value.startswith("=")
+            )
+            if found:
+                counts[sheet.title] = found
+    except Exception:
+        return counts
+    finally:
+        workbook.close()
+    return counts
+
+
 def _prepare_xlsx(path: Path) -> SourceContent:
+    """Read every tab in the workbook, budgeting the request across all of them."""
     content = SourceContent(label="financial model (Excel)")
     try:
         from openpyxl import load_workbook
@@ -325,33 +447,73 @@ def _prepare_xlsx(path: Path) -> SourceContent:
         content.methodology.append(f"Workbook could not be opened ({type(exc).__name__}).")
         return content
 
-    chunks: list[str] = []
-    for sheet in workbook.worksheets:
-        rows: list[str] = []
-        for row_index, row in enumerate(sheet.iter_rows(values_only=True), start=1):
-            cells = [
-                f"{_column_letter(col)}{row_index}={value}"
-                for col, value in enumerate(row, start=1)
-                if value is not None and str(value).strip() != ""
-            ]
-            if cells:
-                rows.append("  ".join(cells))
-        if rows:
-            chunks.append(f"[sheet {sheet.title}]\n" + "\n".join(rows))
-    workbook.close()
+    sheets: list[_SheetRead] = []
+    try:
+        for sheet in workbook.worksheets:
+            rows, numeric = _read_sheet(sheet)
+            sheets.append(
+                _SheetRead(
+                    title=sheet.title,
+                    hidden=getattr(sheet, "sheet_state", "visible") != "visible",
+                    rows=rows,
+                    numeric_cells=numeric,
+                )
+            )
+    finally:
+        workbook.close()
 
-    if not chunks:
+    populated = [tab for tab in sheets if tab.rows]
+    if not populated:
         content.failed = True
-        content.methodology.append("The workbook contained no populated cells.")
+        content.methodology.append(
+            f"The workbook has {len(sheets)} tab(s) and no populated cells in any of them."
+        )
         return content
 
-    text, truncated = _truncate("\n\n".join(chunks))
-    content.inline_text = text
+    # Blocks are joined by a blank line, so the separators come out of the budget too.
+    budget = MAX_TEXT_CHARS - 2 * (len(populated) - 1)
+    shares = _fair_shares([tab.size for tab in populated], budget)
+    blocks: list[str] = []
+    clipped: list[str] = []
+    for tab, allowance in zip(populated, shares, strict=True):
+        if tab.size <= allowance:
+            blocks.append(tab.block())
+            continue
+        block, shown = _trim_to(tab, allowance)
+        blocks.append(block)
+        clipped.append(f"{tab.title} ({shown:,} of {len(tab.rows):,} rows)")
+
+    content.inline_text = "\n\n".join(blocks)
+
+    names = ", ".join(tab.title for tab in populated)
     content.methodology.append(
-        f"Model read from {len(chunks)} sheet(s); every value carries its cell reference."
+        f"Model read from all {len(populated)} populated tab(s) of {len(sheets)}: {names}. "
+        "Every value carries its sheet and cell reference."
     )
-    if truncated:
-        content.methodology.append("Model text was truncated to fit the request.")
+    empty = [tab.title for tab in sheets if not tab.rows]
+    if empty:
+        content.methodology.append(f"Tabs with no populated cells: {', '.join(empty)}.")
+    hidden = [tab.title for tab in populated if tab.hidden]
+    if hidden:
+        content.methodology.append(f"Hidden tabs were read as well: {', '.join(hidden)}.")
+    if clipped:
+        content.methodology.append(
+            "These tabs were too long to send whole and were clipped to fit: "
+            + "; ".join(clipped)
+            + "."
+        )
+
+    # A tab of formulas whose results Excel never cached reads as labels with no
+    # figures. Say so, rather than letting it look like a tab that states nothing.
+    uncached = _formula_cell_counts(
+        path, {tab.title for tab in populated if tab.numeric_cells == 0}
+    )
+    if uncached:
+        detail = ", ".join(f"{title} ({count:,} cells)" for title, count in uncached.items())
+        content.methodology.append(
+            f"These tabs hold formulas with no cached results, so their figures could not "
+            f"be read: {detail}. Open the workbook in Excel and re-save it to include them."
+        )
     return content
 
 
