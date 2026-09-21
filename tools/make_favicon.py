@@ -1,4 +1,4 @@
-"""Render the TEN Capital mark to PNG favicons.
+"""Render the TEN Capital mark to PNG favicons and the page-header logo.
 
 Committed so the assets are reproducible: run ``python tools/make_favicon.py``
 to regenerate everything in ``src/deckscan/static/``.
@@ -39,8 +39,10 @@ ARC_SPAN = 117.0
 #: (colour, centre angle in PIL degrees — 0° is east, growing clockwise)
 FIGURES = ((CORAL, 240.0), (AMBER, 0.0), (TEAL, 120.0))
 
-#: Sizes to emit. 180 is apple-touch-icon, 192 is the PWA/Android icon.
+#: Sizes to emit. 180 is apple-touch-icon, 192 is the PWA/Android icon, and
+#: brand-mark is the page-header logo: 34 CSS px drawn at 4x for high-DPI screens.
 SIZES = {
+    "brand-mark.png": 136,
     "favicon.png": 32,
     "favicon-16.png": 16,
     "favicon-48.png": 48,

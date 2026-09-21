@@ -248,3 +248,28 @@ def test_bare_favicon_ico_path_resolves():
     response = client.get("/favicon.ico")
     assert response.status_code == 200
     assert response.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_every_image_on_the_page_resolves():
+    """The header logo is an <img>; a missing file is a broken logo on every page."""
+    import re
+
+    for path in ("/", "/does-not-exist"):
+        page = client.get(path, headers={"accept": "text/html"}).text
+        sources = re.findall(r'<img[^>]+src="([^"]+)"', page)
+        assert sources, f"{path} renders no images; the brand mark is missing"
+        for src in sources:
+            response = client.get(src)
+            assert response.status_code == 200, src
+            assert response.content[:8] == b"\x89PNG\r\n\x1a\n", src
+
+
+def test_the_header_uses_the_generated_brand_mark():
+    page = client.get("/").text
+    assert 'class="brand-mark" src="/static/brand-mark.png"' in page
+
+
+def test_the_app_is_named_financial_model_review():
+    page = client.get("/").text
+    assert "Financial Model Review" in page
+    assert "Deck Analyzer" not in page
