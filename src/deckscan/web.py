@@ -1,7 +1,7 @@
-"""FastAPI front end: upload a deck and/or a financial model, get both one-pagers.
+"""FastAPI front end: upload a deck and/or a financial model, get the analysis.
 
 Either upload is enough on its own: a spreadsheet with no deck is a complete run
-whose financial screen is computed from the workbook's own figures.
+whose analysis is computed from the workbook's own figures.
 
 A run makes one or two Claude calls over a whole deck and can take minutes, so
 uploads are handled as background jobs: the browser is redirected to a job page
@@ -38,7 +38,7 @@ from deckscan.pipeline import (
     DECK_SUFFIXES,
     MODEL_SUFFIXES,
     AnalysisRequest,
-    render_outputs,
+    render_output,
     run_analysis,
 )
 
@@ -50,7 +50,7 @@ MAX_WORKERS = int(os.environ.get("WEB_MAX_WORKERS", "2"))
 
 STAGE_READ = "Reading the documents"
 STAGE_RULES = "Running the rule engine"
-STAGE_RENDER = "Rendering the one-pagers"
+STAGE_RENDER = "Rendering the report"
 
 ERROR_HEADINGS = {
     400: "That upload can't be processed",
@@ -113,8 +113,7 @@ class Job:
     score: int | None = None
     counts: dict[str, int] = field(default_factory=dict)
     gaps: int = 0
-    screen_path: Path | None = None
-    narrative_path: Path | None = None
+    report_path: Path | None = None
     json_path: Path | None = None
 
     @property
@@ -153,8 +152,7 @@ class Job:
             "score": self.score,
             "counts": self.counts,
             "gaps": self.gaps,
-            "screen": f"/jobs/{self.id}/download/screen" if self.screen_path else None,
-            "onepager": f"/jobs/{self.id}/download/onepager" if self.narrative_path else None,
+            "report": f"/jobs/{self.id}/download/report" if self.report_path else None,
             "json": f"/jobs/{self.id}/download/json" if self.json_path else None,
         }
 
@@ -211,11 +209,10 @@ def _run_job(job: Job, deck_path: Path | None, model_path: Path | None) -> None:
         job.stage = STAGE_RENDER
         stem = "".join(c for c in job.company if c.isalnum() or c in " -_").strip() or "company"
         stem = "_".join(stem.split())
-        screen = job.workdir / f"{stem}_screen.pdf"
-        narrative = job.workdir / f"{stem}_one_pager.pdf"
+        report = job.workdir / f"{stem}_financial_analysis.pdf"
         sources = [name for name in (job.deck_name, job.model_name) if name]
-        render_outputs(analysis, settings, screen, narrative, sources)
-        job.screen_path, job.narrative_path = screen, narrative
+        render_output(analysis, settings, report, sources)
+        job.report_path = report
 
         payload = job.workdir / f"{stem}_analysis.json"
         payload.write_text(canonical_json(analysis), encoding="utf-8")
@@ -384,11 +381,7 @@ def job_status(job_id: str, _: None = Depends(require_access)) -> JSONResponse:
 @app.get("/jobs/{job_id}/download/{kind}")
 def download(job_id: str, kind: str, _: None = Depends(require_access)) -> FileResponse:
     job = _get_job(job_id)
-    path = {
-        "screen": job.screen_path,
-        "onepager": job.narrative_path,
-        "json": job.json_path,
-    }.get(kind)
+    path = {"report": job.report_path, "json": job.json_path}.get(kind)
     if path is None or not path.exists():
         raise HTTPException(status_code=404, detail="That artifact is not available.")
     media = "application/json" if kind == "json" else "application/pdf"

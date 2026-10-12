@@ -2,7 +2,9 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "uvicorn deckscan.web:app --host 0.0.0.0 --port $PORT"
+# --app-dir puts src/ on sys.path. The package is not pip-installed in the
+# image; see the note in requirements.txt.
+startCommand = "uvicorn deckscan.web:app --app-dir src --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/healthz"
 # Cold start imports matplotlib, pandas and pdfplumber before the first
 # request; 30s was not enough headroom on a small container.

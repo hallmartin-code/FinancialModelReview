@@ -3,11 +3,11 @@
 
 <form class="card" action="/jobs" method="post" enctype="multipart/form-data" id="upload-form">
   <div class="eyebrow">Financial Model Review</div>
-  <h1>Deck or Model<span class="arrow">&rarr;</span><span class="to">Investor One&#8209;Pager</span></h1>
+  <h1>Deck or Model<span class="arrow">&rarr;</span><span class="to">Financial Analysis</span></h1>
   <p class="lede">
-    Upload a pitch deck, a financial model, or both, and get two single-page PDFs: a
-    polished investor one-pager, and a financial screen whose red flags are computed
-    from the numbers Claude found — each one citing the page or cell it came from.
+    Upload a pitch deck, a financial model, or both, and get a financial analysis PDF:
+    every red flag the rule engine fires, with the figures behind it, why it matters,
+    the question to put to the founder, and the page or cell it was read from.
   </p>
 
   {% if api_key_missing %}
@@ -58,7 +58,7 @@
   </div>
 
   <button class="cta" type="submit" id="submit"
-          {% if api_key_missing %}disabled{% endif %}>Generate one-pager PDF</button>
+          {% if api_key_missing %}disabled{% endif %}>Generate financial analysis</button>
 
   <div class="disclosure">
     Claude reads the documents; every red flag is then computed in Python from the figures

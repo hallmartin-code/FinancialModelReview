@@ -1,1 +1,1 @@
-"""Render layer: draw the one-pager from a DeckAnalysis. Never computes."""
+"""Render layer: draw the analysis report from a DeckAnalysis. Never computes."""

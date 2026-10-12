@@ -32,6 +32,29 @@ CLAIM_FIELDS: dict[str, str] = {
     ),
 }
 
+#: Narrative fields Claude is asked for, alongside the figures.
+#:
+#: The report is a financial analysis, not a pitch summary, so none of this is
+#: rendered as prose. It is still extracted because two rule families read it:
+#: ``completeness`` looks here for a financials section the figures alone do not
+#: evidence, and ``unit_economics`` infers B2B/B2C from it to pick the right
+#: LTV:CAC ceiling. ``company_name`` and ``tagline`` also title the report.
+NARRATIVE_FIELDS: dict[str, str] = {
+    "company_name": "The company name exactly as written in the source document.",
+    "tagline": "One-line positioning statement or descriptor for the company.",
+    "problem": "The problem the company addresses, in 1-3 sentences.",
+    "solution": "The product or technology and how it works, in 1-3 sentences.",
+    "why_now": "The timing thesis: why this opportunity exists at this moment.",
+    "business_model": "How the company makes money: pricing, model, transaction structure.",
+    "market_size": "TAM/SAM/SOM figures and the market narrative, with any stated sources.",
+    "traction": "Revenue, users, growth, pilots, grants, or other concrete traction evidence.",
+    "team": "Key founders and executives with the background stated in the source document.",
+    "stage": "Company stage, e.g. Pre-seed, Seed, Series A, as stated or clearly labeled.",
+    "ask": "Raise amount, instrument, use of funds, runway, and amount committed to date.",
+    "key_risks_retired": "De-risking already achieved: validation, approvals, partnerships.",
+    "contact": "Founder or contact name and email address if present in the source document.",
+}
+
 _METHOD_ENUM = ["text", "table", "ocr", "cell"]
 
 
@@ -53,8 +76,8 @@ def _object(properties: dict[str, Any]) -> dict[str, Any]:
 def extraction_schema(settings: Settings, narrative_fields: dict[str, str]) -> dict[str, Any]:
     """Build the extraction schema for one source document.
 
-    ``narrative_fields`` comes from the one-pager template, so the fields Claude is
-    asked for and the fields the document renders stay the same set by construction.
+    ``narrative_fields`` is normally :data:`NARRATIVE_FIELDS`; it stays a parameter
+    so a caller can narrow what Claude is asked to read.
     """
     metric_names = sorted(settings.metric_aliases)
 

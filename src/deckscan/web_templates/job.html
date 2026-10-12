@@ -22,7 +22,7 @@
 
   <div class="notice warn" id="warning" style="display:none">
     <span><b>The upload could not be read.</b> <span id="warning-text"></span>
-    These PDFs record what is missing, not what the source says.</span>
+    This report records what is missing, not what the source says.</span>
   </div>
 
   <div id="results" {% if job.status != 'done' %}style="display:none"{% endif %}>
@@ -37,7 +37,7 @@
 
     <div class="disclosure">
       Available for {{ ttl_minutes }} minutes, then deleted from the server.
-      Automated screen — findings are extraction-based and require analyst verification
+      Automated analysis — findings are extraction-based and require analyst verification
       before any investment decision.
     </div>
   </div>
@@ -49,7 +49,7 @@
 {% block scripts %}
 <script>
 const jobId = {{ job.id | tojson }};
-const LABELS = ["Reading the documents", "Running the rule engine", "Rendering the one-pagers"];
+const LABELS = ["Reading the documents", "Running the rule engine", "Rendering the report"];
 
 const DOC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.6"
   stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/>
@@ -112,8 +112,7 @@ function renderResults(data) {
   ).join("");
 
   const links = [
-    [data.onepager, "Investor one-pager", "PDF"],
-    [data.screen, "Financial screen", "PDF"],
+    [data.report, "Financial analysis", "PDF"],
     [data.json, "Full analysis", "JSON"],
   ].filter(([href]) => href);
 

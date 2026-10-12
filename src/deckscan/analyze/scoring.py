@@ -63,10 +63,11 @@ class GroundingItem:
 
 
 def grounding_items(analysis: DeckAnalysis, settings: Settings) -> list[GroundingItem]:
-    """The merged, ranked list investors act on, capped by ``render.max_grounding_items``.
+    """The merged, ranked list investors act on, every item of it.
 
     Flags and gaps are merged deliberately: the headline item is usually the
-    missing cash flow, which is a gap, not a flag.
+    missing cash flow, which is a gap, not a flag. Nothing is trimmed here: the
+    report paginates, so the renderer never needs a shorter list.
     """
     items = [
         GroundingItem(
@@ -92,8 +93,8 @@ def grounding_items(analysis: DeckAnalysis, settings: Settings) -> list[Groundin
 
     # One line per distinct subject. A completeness flag and its gap describe the
     # same hole in the same words but ask for it slightly differently, so match on
-    # the claim as well as the question - otherwise the missing cash flow burns two
-    # of the six slots and pushes a real finding off the page.
+    # the claim as well as the question - otherwise the missing cash flow is
+    # reported twice in a row and reads as two separate problems.
     seen_claims: set[str] = set()
     seen_asks: set[str] = set()
     deduped: list[GroundingItem] = []
@@ -105,4 +106,4 @@ def grounding_items(analysis: DeckAnalysis, settings: Settings) -> list[Groundin
         seen_claims.add(claim)
         seen_asks.add(ask)
         deduped.append(item)
-    return deduped[: settings.render.max_grounding_items]
+    return deduped

@@ -1,32 +1,33 @@
 # deckscan
 
-Upload a pitch deck, a financial model, or both. Get two investor documents back:
+Upload a pitch deck, a financial model, or both. Get one document back:
 
-1. **Financial screen** — grounding score, metric tiles, an actuals-vs-projections
-   revenue chart, red flags that quote the numbers and page references that
-   triggered them, and a ranked list of what needs grounding.
-2. **Investor one-pager** — problem, solution, why now, business model, market
-   size, traction, team, stage, ask, and risks retired, laid out to the standard
-   TEN Capital template, with a red-flag analysis band at the foot of the page:
-   the narrative above is what the company says, the band is what the numbers
-   show. Top flags with their figures, the grounding score, and the three
-   questions that would settle the most load-bearing claims.
+**Financial analysis** — grounding score, metric tiles, an actuals-vs-projections
+revenue chart, then every red flag the rule engine fired. Each flag carries the
+finding with the figures in it, why it matters, the question to put to the
+founder, and the page or cell it was read from. After the flags: everything that
+needs grounding, everything missing from the model, and the full methodology.
 
-Both are single-page PDFs. Runs as a CLI or as a web app on Railway.
+The report is as long as the findings require — it paginates rather than
+dropping anything. Runs as a CLI or as a web app on Railway.
 
 ## How it works
 
 ```
 deck .pdf/.pptx/.docx ─────┐
-                           ├─►  Claude Opus 5  ─►  merge  ─►  rule engine  ─►  two PDFs
+                           ├─►  Claude Opus 5  ─►  merge  ─►  rule engine  ─►  one PDF
 model .xlsx/.xlsm/.csv ────┘     (reads)          (Python)     (Python)
 ```
 
 Either input is enough on its own. A spreadsheet with no deck is a complete run:
 every figure carries its `Sheet!C14` cell reference into the flags exactly as a
-deck's figures carry their page, and the narrative one-pager falls back to
-whatever prose the workbook itself states — a cover sheet's company name and
-positioning line — rendering the rest as gaps rather than inventing it.
+deck's figures carry their page.
+
+Claude is also asked for the narrative around the numbers — the problem, the
+business model, the market — but none of it is rendered as prose. It is read
+because two rule families need it: `completeness` looks there for a financials
+section the figures alone do not evidence, and `unit_economics` infers B2B or
+B2C from it to pick the right LTV:CAC ceiling.
 
 **Claude reads; Python decides.** Claude extracts figures, periods, and narrative
 text — each with the page, slide, or cell it came from — and returns them as
@@ -78,11 +79,9 @@ Python 3.12+.
 ## CLI
 
 ```bash
-deckscan analyze SOURCE [--model MODEL.xlsx] [--out SCREEN.pdf]
-                 [--narrative ONEPAGER.pdf] [--json ANALYSIS.json]
-                 [--company "Name"] [--config PATH] [--strict] [-v]
-
-deckscan template --out onepager-template.pdf   # blank structural template
+deckscan analyze SOURCE [--model MODEL.xlsx] [--out ANALYSIS.pdf]
+                 [--json ANALYSIS.json] [--company "Name"]
+                 [--config PATH] [--strict] [-v]
 ```
 
 `SOURCE` is a deck (`.pdf`, `.pptx`, `.docx`) **or** a financial model (`.xlsx`,
@@ -94,7 +93,8 @@ deckscan analyze model.xlsx                    # model only
 deckscan analyze deck.pdf --model model.xlsx   # both
 ```
 
-Both PDFs are written on every run. `--model` is authoritative: where the model
+The report is written on every run, to `<source-stem>-analysis.pdf` unless
+`--out` says otherwise. `--model` is authoritative: where the model
 and the deck disagree by more than 5%, the model's figure is used *and* a
 `DATA_INCONSISTENCY` flag names both values with their locations. Passing a
 spreadsheet as `SOURCE` and another to `--model` is an error — there is no deck
@@ -115,7 +115,7 @@ uvicorn deckscan.web:app --reload --port 8000
 Drag a deck **or a spreadsheet** onto the main dropzone — it takes either, and a
 spreadsheet dropped there is read as the financial model. Use the second dropzone
 only to pair a model with a deck. Then watch the three-step progress and download
-both PDFs and the full JSON. Uploads run as background jobs;
+the report and the full JSON. Uploads run as background jobs;
 files and results are deleted after `JOB_TTL_SECONDS` (default one hour).
 
 The interface uses the TEN Capital Network design system — dark navy card, the
@@ -167,11 +167,8 @@ thresholds:
     hockey_stick_multiple: 2.5
 ```
 
-The narrative one-pager's structure — which fields are extracted, what each
-section is labelled, and every colour and measurement — lives in
-[`src/deckscan/config/onepager_template.json`](src/deckscan/config/onepager_template.json).
-The fields Claude is asked for come from that same file, so the document and the
-extraction can never drift apart.
+The narrative fields Claude is asked to read are
+[`NARRATIVE_FIELDS`](src/deckscan/extract/schema.py) in the extraction schema.
 
 ## What the rules check
 

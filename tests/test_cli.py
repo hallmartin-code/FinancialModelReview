@@ -61,27 +61,16 @@ def test_near_miss_formats_say_how_to_convert(tmp_path, name, expected):
     assert expected in result.output
 
 
-def test_analyze_without_a_key_still_produces_both_pdfs(tmp_path, tiny_pdf):
-    screen = tmp_path / "screen.pdf"
-    onepager = tmp_path / "onepager.pdf"
+def test_analyze_without_a_key_still_produces_the_report(tmp_path, tiny_pdf):
+    report = tmp_path / "report.pdf"
     result = runner.invoke(
         app,
-        [
-            "analyze",
-            str(tiny_pdf),
-            "--company",
-            "Acme Inc",
-            "--out",
-            str(screen),
-            "--narrative",
-            str(onepager),
-        ],
+        ["analyze", str(tiny_pdf), "--company", "Acme Inc", "--out", str(report)],
     )
     assert result.exit_code == 0, result.output
     assert "ANTHROPIC_API_KEY is not set" in result.output
     assert "Acme Inc" in result.output
-    assert len(PdfReader(str(screen)).pages) == 1
-    assert len(PdfReader(str(onepager)).pages) == 1
+    assert len(PdfReader(str(report)).pages) >= 1
 
 
 def test_json_export_is_written_and_stable(tmp_path, tiny_pdf):
@@ -96,8 +85,6 @@ def test_json_export_is_written_and_stable(tmp_path, tiny_pdf):
                 str(target),
                 "--out",
                 str(tmp_path / "s.pdf"),
-                "--narrative",
-                str(tmp_path / "n.pdf"),
             ],
         )
         assert result.exit_code == 0, result.output
@@ -116,19 +103,10 @@ def test_verbose_prints_methodology(tmp_path, tiny_pdf):
             "-v",
             "--out",
             str(tmp_path / "s.pdf"),
-            "--narrative",
-            str(tmp_path / "n.pdf"),
         ],
     )
     assert result.exit_code == 0
     assert "computed deterministically" in result.output
-
-
-def test_template_command_renders_the_skeleton(tmp_path):
-    out = tmp_path / "template.pdf"
-    result = runner.invoke(app, ["template", "--out", str(out)])
-    assert result.exit_code == 0
-    assert len(PdfReader(str(out)).pages) == 1
 
 
 def test_version_command():
@@ -147,24 +125,13 @@ def tiny_model(tmp_path):
 
 def test_a_spreadsheet_alone_is_a_complete_run(tmp_path, tiny_model):
     """No deck required: the model is a source in its own right."""
-    screen = tmp_path / "screen.pdf"
-    onepager = tmp_path / "onepager.pdf"
+    report = tmp_path / "report.pdf"
     result = runner.invoke(
         app,
-        [
-            "analyze",
-            str(tiny_model),
-            "--company",
-            "Acme Inc",
-            "--out",
-            str(screen),
-            "--narrative",
-            str(onepager),
-        ],
+        ["analyze", str(tiny_model), "--company", "Acme Inc", "--out", str(report)],
     )
     assert result.exit_code == 0, result.output
-    assert len(PdfReader(str(screen)).pages) == 1
-    assert len(PdfReader(str(onepager)).pages) == 1
+    assert len(PdfReader(str(report)).pages) >= 1
 
 
 def test_an_xlsx_alone_is_accepted(tmp_path):
@@ -184,8 +151,6 @@ def test_an_xlsx_alone_is_accepted(tmp_path):
             str(path),
             "--out",
             str(tmp_path / "s.pdf"),
-            "--narrative",
-            str(tmp_path / "n.pdf"),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -200,8 +165,6 @@ def test_model_only_run_names_the_model_as_the_only_source(tmp_path, tiny_model)
             "-v",
             "--out",
             str(tmp_path / "s.pdf"),
-            "--narrative",
-            str(tmp_path / "n.pdf"),
         ],
     )
     assert result.exit_code == 0

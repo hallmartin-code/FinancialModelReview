@@ -29,12 +29,11 @@ from deckscan.models import DeckAnalysis, canonical_json
 from deckscan.pipeline import (
     AnalysisRequest,
     InputError,
-    default_output_paths,
-    render_outputs,
+    default_output_path,
+    render_output,
     resolve_inputs,
     run_analysis,
 )
-from deckscan.render.narrative import render_template_skeleton
 
 # The key lives in .env for local runs; on Railway it is a service variable.
 # load_dotenv never overrides a variable already exported in the shell.
@@ -55,10 +54,7 @@ app = typer.Typer(
     name="deckscan",
     add_completion=False,
     no_args_is_help=True,
-    help=(
-        "Pitch deck or financial model to investor one-pagers, with a deterministic "
-        "financial red-flag scan."
-    ),
+    help="Financial analysis of a pitch deck or financial model, with deterministic red flags.",
 )
 
 
@@ -100,13 +96,7 @@ def analyze(
     ] = None,
     out: Annotated[
         Path | None,
-        typer.Option("--out", help="Financial screen PDF. Default: <deck-stem>-screen.pdf"),
-    ] = None,
-    narrative: Annotated[
-        Path | None,
-        typer.Option(
-            "--narrative", help="Narrative one-pager PDF. Default: <deck-stem>-onepager.pdf"
-        ),
+        typer.Option("--out", help="Financial analysis PDF. Default: <source-stem>-analysis.pdf"),
     ] = None,
     json_out: Annotated[
         Path | None,
@@ -133,7 +123,7 @@ def analyze(
         typer.Option("--verbose", "-v", help="Print methodology notes to stderr."),
     ] = False,
 ) -> None:
-    """Analyze a pitch deck, a financial model, or both, and emit both one-pagers."""
+    """Analyze a pitch deck, a financial model, or both, and write the analysis PDF."""
     try:
         deck_path, model_path = resolve_inputs(source_path, model)
         settings = load_config(config)
@@ -159,12 +149,9 @@ def analyze(
     )
     analysis = run_analysis(request)
 
-    default_screen, default_narrative = default_output_paths(source_path)
-    screen_path = out or default_screen
-    narrative_path = narrative or default_narrative
-
+    report_path = out or default_output_path(source_path)
     sources = [p.name for p in (deck_path, model_path) if p is not None]
-    render_outputs(analysis, settings, screen_path, narrative_path, sources)
+    render_output(analysis, settings, report_path, sources)
 
     if json_out is not None:
         json_out.parent.mkdir(parents=True, exist_ok=True)
@@ -174,25 +161,10 @@ def analyze(
         for note in analysis.methodology:
             _echo_err(f"  {note}")
 
-    _print_summary(
-        analysis,
-        {"Screen:": screen_path, "One-pager:": narrative_path, "JSON:": json_out},
-    )
+    _print_summary(analysis, {"Report:": report_path, "JSON:": json_out})
 
     if strict and any(flag.severity == "critical" for flag in analysis.flags):
         raise typer.Exit(EXIT_STRICT_CRITICAL)
-
-
-@app.command()
-def template(
-    out: Annotated[
-        Path,
-        typer.Option("--out", help="Where to write the blank structural template."),
-    ] = Path("onepager-template.pdf"),
-) -> None:
-    """Render the one-pager template with placeholders instead of company data."""
-    render_template_skeleton(out)
-    typer.echo(f"Template: {out}")
 
 
 @app.command()

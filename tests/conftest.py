@@ -13,10 +13,9 @@ import pytest
 
 from deckscan.analyze.engine import run as run_rules
 from deckscan.config import clear_config_cache, load_config
-from deckscan.extract.schema import CLAIM_FIELDS
+from deckscan.extract.schema import CLAIM_FIELDS, NARRATIVE_FIELDS
 from deckscan.models import DeckAnalysis
 from deckscan.parse.merge import build_analysis
-from deckscan.render.narrative import analysis_fields
 
 
 @pytest.fixture(scope="session")
@@ -27,7 +26,7 @@ def settings():
 
 @pytest.fixture(scope="session")
 def fields():
-    return analysis_fields()
+    return dict(NARRATIVE_FIELDS)
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +58,7 @@ def make_payload(
     all_claims.update(claims or {})
 
     return {
-        "narrative": dict.fromkeys(analysis_fields(), "") | (narrative or {}),
+        "narrative": dict.fromkeys(NARRATIVE_FIELDS, "") | (narrative or {}),
         "sector": sector,
         "stage_guess": stage,
         "deck_date": deck_date,

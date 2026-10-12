@@ -5,13 +5,14 @@ This is the one place that knows the order of the layers::
     extract (Claude)  ->  parse/merge  ->  analyze (deterministic rules)  ->  render
 
 Claude reads the documents; it does not decide anything. Every flag on the
-financial screen is computed in Python from the extracted figures, so the same
+flag in the report is computed in Python from the extracted figures, so the same
 extraction always produces the same verdicts.
 
 A run needs at least one source and accepts two: a deck, a spreadsheet model, or
-both. A spreadsheet on its own is a complete run — the financial screen is
-computed from its figures exactly as it would be from a deck's, and the
-narrative one-pager falls back to whatever prose the workbook itself carries.
+both. A spreadsheet on its own is a complete run: the analysis is computed from
+its figures exactly as it would be from a deck's.
+
+One document comes out of a run: the financial analysis report.
 
 Nothing here raises on source *content*: an extractor failure is degraded to a
 recorded gap plus a methodology note, and the run still produces a report.
@@ -27,11 +28,11 @@ from deckscan.analyze.engine import run as run_rules
 from deckscan.analyze.rules.support import make_gap
 from deckscan.config import Settings
 from deckscan.extract.claude import ExtractionError, api_key_present, extract
+from deckscan.extract.schema import NARRATIVE_FIELDS
 from deckscan.extract.source import SourceContent, prepare_deck, prepare_model
 from deckscan.models import DeckAnalysis, sort_gaps
 from deckscan.parse.merge import build_analysis
-from deckscan.render.narrative import analysis_fields, render_narrative
-from deckscan.render.onepager import render_onepager
+from deckscan.render.analysis import render_analysis
 
 OcrMode = Literal["auto", "always", "never"]
 
@@ -76,8 +77,7 @@ class AnalysisResult:
     """The analysis plus the paths of everything written for it."""
 
     analysis: DeckAnalysis
-    onepager_path: Path | None = None
-    narrative_path: Path | None = None
+    report_path: Path | None = None
     json_path: Path | None = None
     sources: list[str] = field(default_factory=list)
 
@@ -149,7 +149,7 @@ def _read_source(
 def run_analysis(request: AnalysisRequest) -> DeckAnalysis:
     """Run the full pipeline for one request."""
     settings = request.settings
-    fields = analysis_fields()
+    fields = dict(NARRATIVE_FIELDS)
     notes: list[str] = []
 
     deck_payload: dict[str, Any] | None = None
@@ -171,7 +171,7 @@ def run_analysis(request: AnalysisRequest) -> DeckAnalysis:
     elif request.deck_path is None:
         notes.append(
             f"No pitch deck supplied; the financial model {request.model_path.name} is the "
-            "only source, so narrative sections carry only what the workbook itself states."
+            "only source, so any context beyond the figures is whatever the workbook states."
         )
     elif model_payload is not None:
         notes.append(
@@ -207,23 +207,16 @@ def run_analysis(request: AnalysisRequest) -> DeckAnalysis:
     return analysis
 
 
-def render_outputs(
+def render_output(
     analysis: DeckAnalysis,
     settings: Settings,
-    onepager_path: Path,
-    narrative_path: Path,
+    report_path: Path,
     sources: list[str],
-) -> tuple[Path, Path]:
-    """Write both PDFs and return their paths."""
-    render_onepager(analysis, onepager_path, settings, sources=sources)
-    render_narrative(analysis, narrative_path, settings=settings)
-    return onepager_path, narrative_path
+) -> Path:
+    """Write the financial analysis PDF and return its path."""
+    return render_analysis(analysis, report_path, settings, sources=sources)
 
 
-def default_output_paths(source_path: Path, directory: Path | None = None) -> tuple[Path, Path]:
-    """``<stem>-screen.pdf`` and ``<stem>-onepager.pdf``."""
-    target = directory or Path.cwd()
-    return (
-        target / f"{source_path.stem}-screen.pdf",
-        target / f"{source_path.stem}-onepager.pdf",
-    )
+def default_output_path(source_path: Path, directory: Path | None = None) -> Path:
+    """``<stem>-analysis.pdf``."""
+    return (directory or Path.cwd()) / f"{source_path.stem}-analysis.pdf"

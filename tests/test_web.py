@@ -205,7 +205,7 @@ def test_an_unreadable_deck_finishes_with_a_warning_not_a_clean_result(monkeypat
 
     assert state["status"] == "done"  # the run still produces a report
     assert state["warning"], "an unreadable deck must not look like a clean result"
-    assert state["screen"] and state["onepager"]
+    assert state["report"]
 
 
 def test_unknown_job_is_404():

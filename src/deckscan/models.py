@@ -1,6 +1,6 @@
 """Core data models for deckscan.
 
-Every value that reaches the one-pager carries provenance back to a location in
+Every value that reaches the report carries provenance back to a location in
 the input. Models here are deliberately permissive about *missing* data (that is
 recorded as a ``Gap``) and strict about *unsupported* data (a ``Flag`` without
 evidence or without a number in its finding is a bug, and is rejected here).
@@ -136,7 +136,7 @@ class RuleResult(BaseModel):
 
 
 class DeckAnalysis(BaseModel):
-    """The complete analysis payload; both one-pagers are renderings of this."""
+    """The complete analysis payload; the report is a rendering of this."""
 
     company: str | None = None
     tagline: str | None = None
@@ -146,7 +146,7 @@ class DeckAnalysis(BaseModel):
     """As-of date for the deck, from document metadata or an in-deck date string."""
     raise_ask: Metric | None = None
     narrative: dict[str, str] = Field(default_factory=dict)
-    """Template ``analysis_fields`` -> extracted text. ``""`` means not found, and the
+    """``NARRATIVE_FIELDS`` -> extracted text. ``""`` means not found, and the
     renderer omits that section rather than inventing one."""
     actual_periods: list[str] = Field(default_factory=list)
     """Period labels the source identifies as historical, in chronological order."""

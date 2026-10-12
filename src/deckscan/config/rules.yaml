@@ -83,7 +83,7 @@ metric_aliases:
   raise_ask: ["raising", "raise", "seeking", "the ask", "we are raising", "round size"]
   valuation: ["valuation", "pre-money", "post-money", "cap", "valuation cap"]
 
-# Metrics shown in the one-pager snapshot strip and used for provenance density.
+# Metrics shown in the report's snapshot strip and used for provenance density.
 headline_metrics: ["arr", "revenue", "gross_margin", "burn_monthly", "runway_months", "ltv_cac_ratio"]
 
 # --------------------------------------------------------------------------
@@ -235,8 +235,6 @@ scoring:
 # Rendering
 # --------------------------------------------------------------------------
 render:
-  max_flags: 8
-  max_grounding_items: 6
   max_metric_tiles: 6
   min_chart_periods: 2
   not_disclosed_label: "not disclosed"
@@ -245,9 +243,8 @@ render:
   unread_label: >-
     Nothing could be extracted from the source, so no rule could be evaluated.
     This is not a clean result - it is an unread one.
-  overflow_label: "+{count} more in the JSON export"
   disclaimer: >-
-    Automated screen. Findings are extraction-based and require analyst
+    Automated analysis. Findings are extraction-based and require analyst
     verification before any investment decision.
   severity_colors:
     critical: "#B4232B"

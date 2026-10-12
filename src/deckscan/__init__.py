@@ -1,4 +1,4 @@
-"""deckscan - pitch deck to one-pager PDF with a deterministic financial red-flag scan."""
+"""deckscan - financial analysis PDF from a deck or model, with deterministic red flags."""
 
 from __future__ import annotations
 

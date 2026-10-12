@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "deckscan"
 version = "0.1.0"
-description = "Pitch deck to one-pager PDF with a deterministic financial red-flag scan."
+description = "Financial analysis PDF from a deck or model, with deterministic red flags."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "TEN Capital" }]
@@ -60,7 +60,6 @@ where = ["src"]
 [tool.setuptools.package-data]
 deckscan = [
     "config/*.yaml",
-    "config/*.json",
     "web_templates/*.html",
     "static/*.png",
     "py.typed",
