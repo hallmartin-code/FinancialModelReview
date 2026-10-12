@@ -33,7 +33,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from deckscan.config import load_config
 from deckscan.extract.claude import api_key_present
-from deckscan.models import canonical_json
 from deckscan.pipeline import (
     DECK_SUFFIXES,
     MODEL_SUFFIXES,
@@ -114,7 +113,6 @@ class Job:
     counts: dict[str, int] = field(default_factory=dict)
     gaps: int = 0
     report_path: Path | None = None
-    json_path: Path | None = None
 
     @property
     def source_name(self) -> str:
@@ -153,7 +151,6 @@ class Job:
             "counts": self.counts,
             "gaps": self.gaps,
             "report": f"/jobs/{self.id}/download/report" if self.report_path else None,
-            "json": f"/jobs/{self.id}/download/json" if self.json_path else None,
         }
 
 
@@ -213,10 +210,6 @@ def _run_job(job: Job, deck_path: Path | None, model_path: Path | None) -> None:
         sources = [name for name in (job.deck_name, job.model_name) if name]
         render_output(analysis, settings, report, sources)
         job.report_path = report
-
-        payload = job.workdir / f"{stem}_analysis.json"
-        payload.write_text(canonical_json(analysis), encoding="utf-8")
-        job.json_path = payload
 
         job.stage, job.status = "Complete", "done"
     except Exception as exc:  # a failed run must still explain itself
@@ -381,8 +374,7 @@ def job_status(job_id: str, _: None = Depends(require_access)) -> JSONResponse:
 @app.get("/jobs/{job_id}/download/{kind}")
 def download(job_id: str, kind: str, _: None = Depends(require_access)) -> FileResponse:
     job = _get_job(job_id)
-    path = {"report": job.report_path, "json": job.json_path}.get(kind)
+    path = {"report": job.report_path}.get(kind)
     if path is None or not path.exists():
         raise HTTPException(status_code=404, detail="That artifact is not available.")
-    media = "application/json" if kind == "json" else "application/pdf"
-    return FileResponse(path, media_type=media, filename=path.name)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)

@@ -113,7 +113,6 @@ function renderResults(data) {
 
   const links = [
     [data.report, "Financial analysis", "PDF"],
-    [data.json, "Full analysis", "JSON"],
   ].filter(([href]) => href);
 
   document.getElementById("downloads").innerHTML = links.map(([href, name, kind]) =>

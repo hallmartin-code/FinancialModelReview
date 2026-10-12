@@ -78,7 +78,6 @@ class AnalysisResult:
 
     analysis: DeckAnalysis
     report_path: Path | None = None
-    json_path: Path | None = None
     sources: list[str] = field(default_factory=list)
 
 
